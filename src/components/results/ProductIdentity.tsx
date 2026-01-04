@@ -1,0 +1,68 @@
+'use client';
+
+import React from 'react';
+import { motion } from 'framer-motion';
+import { CheckCircle2, Tag, Box, Layers, Sparkles } from 'lucide-react';
+import { TechIdentity } from '@/types';
+
+interface ProductIdentityProps {
+    identity: TechIdentity;
+    delay?: number;
+}
+
+const springConfig = { type: "spring", stiffness: 300, damping: 30, mass: 1 } as const;
+
+export const ProductIdentity: React.FC<ProductIdentityProps> = ({ identity, delay = 0 }) => {
+    return (
+        <div className="grid grid-cols-2 gap-3 mb-3">
+            <motion.div
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springConfig, delay: delay }}
+                className="p-4 rounded-2xl bg-white/5 border border-white/5 flex flex-col gap-1"
+            >
+                <div className="flex items-center gap-1.5 text-[8px] uppercase font-black tracking-widest text-white/20">
+                    <Tag className="w-3 h-3" /> Brand
+                </div>
+                <div className="text-sm text-white font-bold truncate">{identity.brand}</div>
+            </motion.div>
+
+            <motion.div
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springConfig, delay: delay + 0.1 }}
+                className="p-4 rounded-2xl bg-white/5 border border-white/5 flex flex-col gap-1"
+            >
+                <div className="flex items-center gap-1.5 text-[8px] uppercase font-black tracking-widest text-white/20">
+                    <Box className="w-3 h-3" /> Category
+                </div>
+                <div className="text-sm text-white font-bold truncate">{identity.category}</div>
+            </motion.div>
+
+            <motion.div
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springConfig, delay: delay + 0.2 }}
+                className="col-span-2 p-5 rounded-[1.5rem] bg-white/5 border border-white/5 flex flex-col gap-4"
+            >
+                <div className="flex items-center gap-1.5 text-[8px] uppercase font-black tracking-widest text-white/20">
+                    <Layers className="w-3.5 h-3.5" /> Technical DNA
+                </div>
+                <div className="grid gap-2.5">
+                    {identity.keySpecs.map((spec, idx) => (
+                        <div key={idx} className="flex items-start gap-2.5 text-xs text-white/80 font-semibold leading-snug">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                            <span>{spec}</span>
+                        </div>
+                    ))}
+                </div>
+            </motion.div>
+
+            <motion.div
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springConfig, delay: delay + 0.3 }}
+                className="col-span-2 p-5 rounded-[1.5rem] bg-emerald-500/10 border border-emerald-500/20 relative overflow-hidden"
+            >
+                <div className="flex items-center gap-1.5 text-[8px] uppercase font-black tracking-widest text-emerald-400 mb-3">
+                    <Sparkles className="w-3.5 h-3.5" /> Verdict
+                </div>
+                <div className="text-white/80 leading-relaxed font-bold text-xs italic">
+                    "{identity.insight}"
+                </div>
+            </motion.div>
+        </div>
+    );
+};

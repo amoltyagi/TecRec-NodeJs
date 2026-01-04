@@ -1,0 +1,9 @@
+
+{
+  "name": "TecRecv2 - Tech Decoder ",
+  "description": "A premium shopping assistant featuring Apple-inspired Liquid Glass UI and agentic tech decoding.",
+  "requestFramePermissions": [
+    "clipboard-read",
+    "camera"
+  ]
+}
