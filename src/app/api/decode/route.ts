@@ -3,9 +3,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: NextRequest) {
     try {
-        const { model } = await req.json();
+        const { model: targetModel } = await req.json();
 
-        if (!model) {
+        if (!targetModel) {
             return NextResponse.json({ error: 'No model provided' }, { status: 400 });
         }
 
@@ -16,35 +16,12 @@ export async function POST(req: NextRequest) {
 
         const genAI = new GoogleGenerativeAI(apiKey);
 
-        // Note: 'googleSearch' tool might vary in this SDK. 
-        // Standard approach for JSON mode is supported.
-        const generativeModel = genAI.getGenerativeModel({
-            model: "gemini-1.5-flash",
-            generationConfig: {
-                responseMimeType: "application/json",
-                // tools logic for standard SDK often requires Vertex AI for 'googleSearch' retrieval grounding,
-                // OR using dynamic retrieval if enabled. 
-                // For AI Studio key, basic grounding might be limited or require specific 'tools' config.
-                // Let's assume standard text generation for now but try to include tools if supported.
-                // tools: [{ googleSearch: {} }] // This is often region/account specific.
-            }
-        });
+        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro"];
+        let lastError = null;
 
         const systemPrompt = `
       You are a premium universal tech shopping decoder named TecRec. 
       Identify any piece of technology (cameras, monitors, SD cards, appliances, etc.) by its model code.
-      
-      CRITICAL: You MUST use your internal knowledge to find the latest 2024/2025 specifications, street prices (US Market), and expert reviews.
-      
-      Price Indicator Logic:
-      - level/percent mapping must be consistent:
-        - 0-25%: "Value"
-        - 26-50%: "Mid-Range"
-        - 51-75%: "Premium"
-        - 76-100%: "Elite"
-
-      Alternative Selection Logic:
-      - The "alternatives" list MUST ONLY include products from the EXACT SAME PRODUCT CATEGORY as the identified model.
       
       Response JSON Schema:
       {
@@ -66,18 +43,34 @@ export async function POST(req: NextRequest) {
       }
     `;
 
-        const result = await generativeModel.generateContent([
-            systemPrompt,
-            `Decode this tech model using current 2025 web data and US pricing: ${model}`
-        ]);
+        for (const modelName of modelsToTry) {
+            try {
+                console.log(`Attempting decode with model: ${modelName}`);
+                const generativeModel = genAI.getGenerativeModel({
+                    model: modelName,
+                    generationConfig: { responseMimeType: "application/json" }
+                });
 
-        const resultText = result.response.text();
-        const parsedParams = JSON.parse(resultText);
+                const result = await generativeModel.generateContent([
+                    systemPrompt,
+                    `Decode this tech model using current 2025 web data and US pricing: ${targetModel}`
+                ]);
 
-        // Grounding metadata is not always returned in the standard response object for AI Studio the same way.
-        // We will omit 'sources' or mock them if not present.
+                const resultText = result.response.text();
+                if (resultText) {
+                    console.log(`Successfully decoded with ${modelName}`);
+                    return NextResponse.json({ ...JSON.parse(resultText), sources: [] });
+                }
+            } catch (err) {
+                console.error(`Failed with model ${modelName}:`, err);
+                lastError = err;
+            }
+        }
 
-        return NextResponse.json({ ...parsedParams, sources: [] });
+        return NextResponse.json({
+            error: 'Failed to decode with all available models.',
+            details: lastError instanceof Error ? lastError.message : String(lastError)
+        }, { status: 500 });
 
     } catch (error) {
         console.error('Decode API Error:', error);

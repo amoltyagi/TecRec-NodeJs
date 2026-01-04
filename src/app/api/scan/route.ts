@@ -15,20 +15,35 @@ export async function POST(req: NextRequest) {
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        const result = await model.generateContent([
-            { inlineData: { data: image, mimeType: 'image/jpeg' } },
-            "Extract the technology product model number or name from this price tag or product label. Return ONLY the model/name string. If nothing found, return 'None'."
-        ]);
+        // Attempt with multiple model identifiers in case of environment-specific naming
+        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro-vision"];
+        let lastError = null;
 
-        const extracted = result.response.text().trim();
+        for (const modelName of modelsToTry) {
+            try {
+                console.log(`Attempting scan with model: ${modelName}`);
+                const model = genAI.getGenerativeModel({ model: modelName });
+                const result = await model.generateContent([
+                    { inlineData: { data: image, mimeType: 'image/jpeg' } },
+                    "Extract the technology product model number or name from this price tag or product label. Return ONLY the model/name string. If nothing found, return 'None'."
+                ]);
 
-        if (!extracted || extracted.toLowerCase() === 'none') {
-            return NextResponse.json({ found: false });
+                const extracted = result.response.text().trim();
+                if (extracted) {
+                    console.log(`Successfully extracted with ${modelName}: ${extracted}`);
+                    return NextResponse.json({ found: extracted.toLowerCase() !== 'none', model: extracted });
+                }
+            } catch (err) {
+                console.error(`Failed with model ${modelName}:`, err);
+                lastError = err;
+            }
         }
 
-        return NextResponse.json({ found: true, model: extracted });
+        return NextResponse.json({
+            error: 'All models failed to respond.',
+            details: lastError instanceof Error ? lastError.message : String(lastError)
+        }, { status: 500 });
 
     } catch (error) {
         console.error('Scan API Error:', error);
