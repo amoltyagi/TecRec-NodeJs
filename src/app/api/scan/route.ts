@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: NextRequest) {
     try {
@@ -14,20 +14,15 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Server API key configuration missing' }, { status: 500 });
         }
 
-        const ai = new GoogleGenAI({ apiKey });
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        // Using the same model as the original implementation
-        const response = await ai.models.generateContent({
-            model: 'gemini-1.5-flash',
-            contents: {
-                parts: [
-                    { inlineData: { data: image, mimeType: 'image/jpeg' } },
-                    { text: "Extract the technology product model number or name from this price tag or product label. Return ONLY the model/name string. If nothing found, return 'None'." }
-                ]
-            }
-        });
+        const result = await model.generateContent([
+            { inlineData: { data: image, mimeType: 'image/jpeg' } },
+            "Extract the technology product model number or name from this price tag or product label. Return ONLY the model/name string. If nothing found, return 'None'."
+        ]);
 
-        const extracted = response.text?.trim();
+        const extracted = result.response.text().trim();
 
         if (!extracted || extracted.toLowerCase() === 'none') {
             return NextResponse.json({ found: false });
