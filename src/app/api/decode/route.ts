@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
         // Using gemini-1.5-pro for better reasoning/search grounding, or sticking to lite if speed is key.
         // Original used 'gemini-flash-lite-latest'. Let's upgrade to 1.5-flash which is standard and supports JSON mode well.
         const response = await ai.models.generateContent({
-            model: 'gemini-1.5-flash-latest',
+            model: 'gemini-1.5-flash',
             contents: {
                 parts: [
                     { text: systemPrompt },

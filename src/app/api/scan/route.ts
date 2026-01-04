@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
         // Using the same model as the original implementation
         const response = await ai.models.generateContent({
-            model: 'gemini-1.5-flash-latest',
+            model: 'gemini-1.5-flash',
             contents: {
                 parts: [
                     { inlineData: { data: image, mimeType: 'image/jpeg' } },
