@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Helper to clean JSON from markdown code fences
+function cleanJsonResponse(text: string): string {
+    let cleaned = text.trim();
+    // Remove markdown code fences if present
+    if (cleaned.startsWith('```')) {
+        cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+    }
+    return cleaned.trim();
+}
+
 export async function POST(req: NextRequest) {
     try {
         const { model: targetModel } = await req.json();
@@ -17,15 +27,15 @@ export async function POST(req: NextRequest) {
 
         const genAI = new GoogleGenerativeAI(apiKey);
 
-        // Use the fastest models first for speed optimization
-        const modelsToTry = ["gemini-2.0-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-flash-latest"];
+        // Use fastest models first for speed optimization
+        const modelsToTry = ["gemini-2.0-flash-lite", "gemini-2.5-flash", "gemini-flash-latest"];
         let lastError = null;
 
         const systemPrompt = `
       You are TecRec, a premium tech decoder. Identify technology products by model code.
       Use your grounding to find 2024/2025 specs, prices (US), & reviews.
       
-      Output JSON only.
+      IMPORTANT: Output ONLY raw JSON, no markdown, no code fences.
       
       Price Logic:
       - 0-25%: "Value"
@@ -62,8 +72,7 @@ export async function POST(req: NextRequest) {
                 console.log(`Attempting decode with model: ${modelName}`);
                 const generativeModel = genAI.getGenerativeModel({
                     model: modelName,
-                    generationConfig: { responseMimeType: "application/json" },
-                    // Enable Google Search grounding for real-time data
+                    // Note: Don't use responseMimeType with tools - they're incompatible
                     tools: [{ googleSearch: {} } as any]
                 });
 
@@ -72,10 +81,12 @@ export async function POST(req: NextRequest) {
                     `Decode this tech model using current 2025 web data and US pricing: ${targetModel}`
                 ]);
 
-                const resultText = result.response.text();
-                if (resultText) {
+                const rawText = result.response.text();
+                if (rawText) {
                     console.log(`Successfully decoded with ${modelName}`);
-                    return NextResponse.json({ ...JSON.parse(resultText), sources: [] });
+                    const cleanedJson = cleanJsonResponse(rawText);
+                    const parsed = JSON.parse(cleanedJson);
+                    return NextResponse.json({ ...parsed, sources: [] });
                 }
             } catch (err) {
                 console.error(`Failed with model ${modelName}:`, err);
