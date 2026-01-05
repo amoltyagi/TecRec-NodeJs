@@ -17,26 +17,13 @@ export async function POST(req: NextRequest) {
 
         const genAI = new GoogleGenerativeAI(apiKey);
 
-        // DEBUG: List available models to see what the key has access to
-        try {
-            console.log("Fetching available models for this key...");
-            const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-            const listData = await listRes.json();
-            if (listData.models) {
-                console.log("AVAILABLE MODELS:", listData.models.map((m: any) => m.name).join(", "));
-            } else {
-                console.log("NO MODELS RETURNED via direct list call. Response:", JSON.stringify(listData));
-            }
-        } catch (listErr) {
-            console.error("Failed to list models:", listErr);
-        }
-
-        const modelsToTry = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"];
+        // Use the fastest models first for speed optimization
+        const modelsToTry = ["gemini-2.0-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-flash-latest"];
         let lastError = null;
 
         const systemPrompt = `
       You are TecRec, a premium tech decoder. Identify technology products by model code.
-      CRITICAL: Use Google Search to find 2024/2025 specs, prices (US), & reviews.
+      Use your grounding to find 2024/2025 specs, prices (US), & reviews.
       
       Output JSON only.
       
@@ -55,9 +42,9 @@ export async function POST(req: NextRequest) {
             "category": "string",
             "keySpecs": ["string"],
             "year": "string",
-            "releaseWindow": "string", // Quarter & Year (e.g. Q3 2024)
-            "amazonLink": "string", // Constructed search URL for Amazon US
-            "insight": "string", // Concise verdict < 30 words
+            "releaseWindow": "string",
+            "amazonLink": "string",
+            "insight": "string",
             "priceIndicator": {
                 "level": "string",
                 "percent": number,
@@ -75,7 +62,9 @@ export async function POST(req: NextRequest) {
                 console.log(`Attempting decode with model: ${modelName}`);
                 const generativeModel = genAI.getGenerativeModel({
                     model: modelName,
-                    generationConfig: { responseMimeType: "application/json" }
+                    generationConfig: { responseMimeType: "application/json" },
+                    // Enable Google Search grounding for real-time data
+                    tools: [{ googleSearch: {} } as any]
                 });
 
                 const result = await generativeModel.generateContent([
