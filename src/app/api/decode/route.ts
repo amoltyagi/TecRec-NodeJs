@@ -17,7 +17,21 @@ export async function POST(req: NextRequest) {
 
         const genAI = new GoogleGenerativeAI(apiKey);
 
-        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro"];
+        // DEBUG: List available models to see what the key has access to
+        try {
+            console.log("Fetching available models for this key...");
+            const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+            const listData = await listRes.json();
+            if (listData.models) {
+                console.log("AVAILABLE MODELS:", listData.models.map((m: any) => m.name).join(", "));
+            } else {
+                console.log("NO MODELS RETURNED via direct list call. Response:", JSON.stringify(listData));
+            }
+        } catch (listErr) {
+            console.error("Failed to list models:", listErr);
+        }
+
+        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash-001", "gemini-1.5-flash-002", "gemini-pro"];
         let lastError = null;
 
         const systemPrompt = `
