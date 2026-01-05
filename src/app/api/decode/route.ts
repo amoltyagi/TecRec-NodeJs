@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
             console.error("Failed to list models:", listErr);
         }
 
-        const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash-001", "gemini-1.5-flash-002", "gemini-pro"];
+        const modelsToTry = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"];
         let lastError = null;
 
         const systemPrompt = `
