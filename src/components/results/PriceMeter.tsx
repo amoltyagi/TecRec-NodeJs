@@ -26,7 +26,7 @@ export const PriceMeter: React.FC<PriceMeterProps> = ({ indicator, delay = 0 }) 
                     <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest block mb-0.5">
                         {indicator.level}
                     </span>
-                    <span className="text-xl font-bold text-white tracking-tight">
+                    <span className="text-xl font-bold font-sans text-white tracking-tight">
                         {indicator.estimatedPrice}
                     </span>
                 </div>

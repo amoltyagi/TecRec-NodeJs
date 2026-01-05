@@ -9,6 +9,8 @@ export interface TechIdentity {
     category: string; // e.g., "Mirrorless Camera"
     keySpecs: string[]; // 3 main key differentiating specs
     year: string;
+    releaseWindow?: string; // e.g. "Q3 2024"
+    amazonLink?: string;
     insight: string;
     priceIndicator?: PriceIndicator;
 }

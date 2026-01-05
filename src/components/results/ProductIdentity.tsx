@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Tag, Box, Layers, Sparkles } from 'lucide-react';
+import { CheckCircle2, Tag, Box, Layers, Sparkles, Calendar, ShoppingCart } from 'lucide-react';
 import { TechIdentity } from '@/types';
 
 interface ProductIdentityProps {
@@ -33,6 +33,30 @@ export const ProductIdentity: React.FC<ProductIdentityProps> = ({ identity, dela
                     <Box className="w-3 h-3" /> Category
                 </div>
                 <div className="text-sm text-white font-bold truncate">{identity.category}</div>
+            </motion.div>
+
+            {/* New Fields */}
+            <motion.div
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springConfig, delay: delay + 0.15 }}
+                className="p-4 rounded-2xl bg-white/5 border border-white/5 flex flex-col gap-1"
+            >
+                <div className="flex items-center gap-1.5 text-[8px] uppercase font-black tracking-widest text-white/20">
+                    <Calendar className="w-3 h-3" /> Release Window
+                </div>
+                <div className="text-sm text-white font-bold truncate">{identity.releaseWindow || identity.year}</div>
+            </motion.div>
+
+            <motion.div
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springConfig, delay: delay + 0.15 }}
+                className="p-4 rounded-2xl bg-white/5 border border-white/5 flex flex-col gap-1 group cursor-pointer hover:bg-white/10 transition-colors"
+                onClick={() => identity.amazonLink && window.open(identity.amazonLink, '_blank')}
+            >
+                <div className="flex items-center gap-1.5 text-[8px] uppercase font-black tracking-widest text-white/20 group-hover:text-amber-400 transition-colors">
+                    <ShoppingCart className="w-3 h-3" /> Amazon Link
+                </div>
+                <div className="text-sm text-white font-bold truncate underline decoration-white/30 decoration-1 underline-offset-4 group-hover:text-amber-400 group-hover:decoration-amber-400/50 transition-all">
+                    View in Market
+                </div>
             </motion.div>
 
             <motion.div

@@ -35,8 +35,18 @@ export async function POST(req: NextRequest) {
         let lastError = null;
 
         const systemPrompt = `
-      You are a premium universal tech shopping decoder named TecRec. 
-      Identify any piece of technology (cameras, monitors, SD cards, appliances, etc.) by its model code.
+      You are TecRec, a premium tech decoder. Identify technology products by model code.
+      CRITICAL: Use Google Search to find 2024/2025 specs, prices (US), & reviews.
+      
+      Output JSON only.
+      
+      Price Logic:
+      - 0-25%: "Value"
+      - 26-50%: "Mid-Range"
+      - 51-75%: "Premium"
+      - 76-100%: "Elite"
+
+      Alternatives: Same exact product category only.
       
       Response JSON Schema:
       {
@@ -45,7 +55,9 @@ export async function POST(req: NextRequest) {
             "category": "string",
             "keySpecs": ["string"],
             "year": "string",
-            "insight": "string",
+            "releaseWindow": "string", // Quarter & Year (e.g. Q3 2024)
+            "amazonLink": "string", // Constructed search URL for Amazon US
+            "insight": "string", // Concise verdict < 30 words
             "priceIndicator": {
                 "level": "string",
                 "percent": number,
