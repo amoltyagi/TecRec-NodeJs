@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
         if (!apiKey) {
             return NextResponse.json({ error: 'Server API key configuration missing' }, { status: 500 });
         }
+        console.log("Using API Key ending in:", apiKey.slice(-4));
 
         const genAI = new GoogleGenerativeAI(apiKey);
 
