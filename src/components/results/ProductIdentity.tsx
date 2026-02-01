@@ -41,9 +41,11 @@ export const ProductIdentity: React.FC<ProductIdentityProps> = ({ identity, dela
                 className="p-4 rounded-2xl bg-white/5 border border-white/5 flex flex-col gap-1"
             >
                 <div className="flex items-center gap-1.5 text-[8px] uppercase font-black tracking-widest text-white/20">
-                    <Calendar className="w-3 h-3" /> Release Window
+                    <Calendar className="w-3 h-3" /> Release
                 </div>
-                <div className="text-sm text-white font-bold truncate">{identity.releaseWindow || identity.year}</div>
+                <div className="text-sm text-white font-bold truncate">
+                    {identity.releaseWindow || identity.year || 'TBD'}
+                </div>
             </motion.div>
 
             <motion.div
