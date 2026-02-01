@@ -55,13 +55,36 @@ export async function POST(req: NextRequest) {
 
       IMPORTANT: Output ONLY raw JSON, no markdown, no code fences.
 
-      Price Logic:
+      ===== PRICING - SINGLE REFERENCE VARIANT ONLY =====
+      CRITICAL: Return only ONE representative variant/spec for pricing, NOT all variations.
+      - For TVs: Use 65" as the reference size (most common/popular)
+      - For Laptops: Use standard/mid-range config (e.g., 16GB RAM, 512GB SSD for mainstream)
+      - For Cameras: Use body-only or standard kit price
+      - For Phones: Use base storage variant (128GB/256GB)
+      - For Audio: Use standard color/finish
+      - For other categories: Use the most popular/mid-range option
+
+      In keySpecs: You may briefly mention that "Also available in [other sizes]" but do NOT
+      list every variant price. The priceIndicator.estimatedPrice must reflect the SINGLE
+      reference variant only.
+
+      Price Logic (based on reference variant):
       - 0-25%: "Value"
       - 26-50%: "Mid-Range"
       - 51-75%: "Premium"
       - 76-100%: "Elite"
 
       Alternatives: Same exact product category only.
+
+      ===== AMAZON LINK REQUIREMENTS =====
+      CRITICAL: amazonLink must be a US Amazon search URL using ONLY the product model code.
+      Format: https://www.amazon.com/s?k=MODEL_CODE
+      - Use ONLY the brand + model number (NOT all features/specs)
+      - Replace spaces with + in the URL
+      - Examples:
+        * "Sony A7 IV" -> https://www.amazon.com/s?k=Sony+A7+IV
+        * "MacBook Pro M3" -> https://www.amazon.com/s?k=MacBook+Pro+M3
+        * "Samsung Galaxy S24 Ultra" -> https://www.amazon.com/s?k=Samsung+Galaxy+S24+Ultra
 
       Response JSON Schema:
       {
