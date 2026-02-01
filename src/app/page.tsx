@@ -206,7 +206,7 @@ export default function Home() {
                 </button>
 
                 <div className="flex flex-wrap justify-center gap-2 px-2">
-                  {['Sony A7 IV', 'SDSQXCD-128G', 'OLED65G4', 'WGG24401GB'].map((suggestion, idx) => (
+                  {['RTX 5090', 'Samsung 990 Pro', 'Sony A7 IV', 'Corsair Vengeance DDR5'].map((suggestion, idx) => (
                     <motion.button
                       key={suggestion}
                       initial={{ opacity: 0, y: 10 }}
