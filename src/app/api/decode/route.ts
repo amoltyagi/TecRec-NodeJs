@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, Tool } from "@google/generative-ai";
+
+// Constants for validation
+const MAX_MODEL_LENGTH = 200;
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 // Helper to clean JSON from markdown code fences
 function cleanJsonResponse(text: string): string {
@@ -11,12 +15,26 @@ function cleanJsonResponse(text: string): string {
     return cleaned.trim();
 }
 
+// Sanitize input by removing control characters and limiting length
+function sanitizeModelInput(input: string): string {
+    return input
+        .trim()
+        .slice(0, MAX_MODEL_LENGTH)
+        .replace(/[\x00-\x1F\x7F]/g, ''); // Remove control chars except newline/tab
+}
+
 export async function POST(req: NextRequest) {
     try {
         const { model: targetModel } = await req.json();
 
-        if (!targetModel) {
-            return NextResponse.json({ error: 'No model provided' }, { status: 400 });
+        if (!targetModel || typeof targetModel !== 'string') {
+            return NextResponse.json({ error: 'Model code is required and must be a string' }, { status: 400 });
+        }
+
+        const sanitizedModel = sanitizeModelInput(targetModel);
+
+        if (sanitizedModel.length === 0) {
+            return NextResponse.json({ error: 'Model code cannot be empty' }, { status: 400 });
         }
 
         const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
@@ -34,9 +52,9 @@ export async function POST(req: NextRequest) {
         const systemPrompt = `
       You are TecRec, a premium tech decoder. Identify technology products by model code.
       Use your grounding to find 2024/2025 specs, prices (US), & reviews.
-      
+
       IMPORTANT: Output ONLY raw JSON, no markdown, no code fences.
-      
+
       Price Logic:
       - 0-25%: "Value"
       - 26-50%: "Mid-Range"
@@ -44,7 +62,7 @@ export async function POST(req: NextRequest) {
       - 76-100%: "Elite"
 
       Alternatives: Same exact product category only.
-      
+
       Response JSON Schema:
       {
         "identity": {
@@ -72,13 +90,13 @@ export async function POST(req: NextRequest) {
                 console.log(`Attempting decode with model: ${modelName}`);
                 const generativeModel = genAI.getGenerativeModel({
                     model: modelName,
-                    // Note: Don't use responseMimeType with tools - they're incompatible
-                    tools: [{ googleSearch: {} } as any]
+                    // Google Search tool configuration - cast to Tool type as SDK doesn't export googleSearch directly
+                    tools: [{ googleSearch: {} } as Tool]
                 });
 
                 const result = await generativeModel.generateContent([
                     systemPrompt,
-                    `Decode this tech model using current 2025 web data and US pricing: ${targetModel}`
+                    `Decode this tech model using current 2025 web data and US pricing: ${sanitizedModel}`
                 ]);
 
                 const rawText = result.response.text();

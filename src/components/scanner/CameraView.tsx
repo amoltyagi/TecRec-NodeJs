@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ScanBarcode, Loader2, Sparkles } from 'lucide-react';
+import { useToast } from '@/context/ToastContext';
 
 interface CameraViewProps {
     isOpen: boolean;
@@ -12,6 +13,7 @@ interface CameraViewProps {
 }
 
 export const CameraView: React.FC<CameraViewProps> = ({ isOpen, onClose, onCapture, isScanning }) => {
+    const { showError } = useToast();
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -30,7 +32,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ isOpen, onClose, onCaptu
                 } catch (err) {
                     console.error("Error accessing camera:", err);
                     onClose();
-                    alert("Camera access denied or not available.");
+                    showError('Camera access denied or not available.');
                 }
             })();
         }

@@ -1,12 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Constants for validation
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+
+// Validate base64 image data
+function validateBase64Image(imageData: string): { valid: boolean; error?: string } {
+    if (!imageData || typeof imageData !== 'string') {
+        return { valid: false, error: 'Image data must be a string' };
+    }
+
+    // Check if it's valid base64
+    const base64Regex = /^[A-Za-z0-9+/]+=*$/;
+    if (!base64Regex.test(imageData)) {
+        return { valid: false, error: 'Invalid base64 format' };
+    }
+
+    // Check size (base64 is ~33% larger than original, so we account for that)
+    const estimatedBytes = Math.floor(imageData.length * 0.75);
+    if (estimatedBytes > MAX_IMAGE_SIZE_BYTES) {
+        return { valid: false, error: `Image too large. Maximum size is ${MAX_IMAGE_SIZE_BYTES / 1024 / 1024}MB` };
+    }
+
+    return { valid: true };
+}
+
 export async function POST(req: NextRequest) {
     try {
         const { image } = await req.json();
 
         if (!image) {
             return NextResponse.json({ error: 'No image data provided' }, { status: 400 });
+        }
+
+        // Validate image data
+        const validation = validateBase64Image(image);
+        if (!validation.valid) {
+            return NextResponse.json({ error: validation.error }, { status: 400 });
         }
 
         const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google"; // Use Plus Jakarta Sans to match design
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+import { ToastProvider } from "@/context/ToastContext";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -24,8 +25,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${jakarta.variable} antialiased font-sans`}>
-        <div className="aurora-bg" />
-        {children}
+        <ToastProvider>
+          <div className="aurora-bg" />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

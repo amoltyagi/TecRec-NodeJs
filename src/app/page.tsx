@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Cpu, ClipboardPaste, ScanBarcode, ArrowLeft, Loader2, Info, ShieldCheck } from 'lucide-react';
 import { CameraView } from '@/components/scanner/CameraView';
@@ -8,19 +8,22 @@ import { ProductIdentity } from '@/components/results/ProductIdentity';
 import { PriceMeter } from '@/components/results/PriceMeter';
 import { AlternativeList } from '@/components/results/AlternativeList';
 import { DecodeResult } from '@/types';
+import { useToast } from '@/context/ToastContext';
 
 const springConfig = { type: "spring", stiffness: 300, damping: 30, mass: 1 } as const;
 
 export default function Home() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  // const [activeModel, setActiveModel] = useState('');
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
 
   const [result, setResult] = useState<DecodeResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMessageIdx, setLoadingMessageIdx] = useState(0);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const { showError, showSuccess } = useToast();
 
   const loadingMessages = [
     "Identifying Category...",
@@ -40,12 +43,28 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [loading]);
 
+  // Cleanup: abort any pending requests on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   const handleDecode = async (e?: React.FormEvent, overrideModel?: string) => {
     e?.preventDefault();
     const modelToUse = overrideModel || searchQuery;
     if (!modelToUse.trim()) return;
 
-    // setActiveModel(modelToUse);
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+
     setIsAnalyzing(true);
     setLoading(true);
     setResult(null);
@@ -55,14 +74,28 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: modelToUse }),
+        signal: abortControllerRef.current.signal,
       });
 
       const data = await res.json();
-      setResult(data);
-    } catch (err) {
-      setResult({ error: "Failed to connect to intelligence engine." });
+
+      if (data.error) {
+        showError(data.error);
+        setResult({ error: data.error });
+      } else {
+        showSuccess('Product decoded successfully');
+        setResult(data);
+      }
+    } catch (err: unknown) {
+      // Only show error if not aborted
+      if (err instanceof Error && err.name === 'AbortError') {
+        return;
+      }
+      showError('Failed to connect to intelligence engine.');
+      setResult({ error: 'Failed to connect to intelligence engine.' });
     } finally {
       setLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -81,11 +114,11 @@ export default function Home() {
         setIsCameraOpen(false);
         handleDecode(undefined, data.model);
       } else {
-        alert("Could not clearly identify a model number. Please try closer or adjust lighting.");
+        showError('Could not clearly identify a model number. Please try closer or adjust lighting.');
       }
     } catch (err) {
-      console.error("Scan error:", err);
-      alert("Scanning failed. Please try again.");
+      console.error('Scan error:', err);
+      showError('Scanning failed. Please try again.');
     } finally {
       setIsScanning(false);
     }
@@ -102,7 +135,6 @@ export default function Home() {
 
   const handleReset = () => {
     setIsAnalyzing(false);
-    // setActiveModel('');
     setSearchQuery('');
     setResult(null);
   };
@@ -182,7 +214,6 @@ export default function Home() {
                       transition={{ ...springConfig, delay: 0.3 + (idx * 0.05) }}
                       onClick={() => {
                         setSearchQuery(suggestion);
-                        // setActiveModel(suggestion);
                         handleDecode(undefined, suggestion);
                       }}
                       className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest px-3.5 py-2.5 rounded-full border border-white/10 bg-white/5 text-white/30 hover:text-white/70 hover:bg-white/10 transition-all"

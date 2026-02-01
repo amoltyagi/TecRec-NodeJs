@@ -10,7 +10,6 @@ interface PriceMeterProps {
     delay?: number;
 }
 
-// TODO: test remove later
 export const PriceMeter: React.FC<PriceMeterProps> = ({ indicator, delay = 0 }) => {
     return (
         <motion.div
