@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI, Tool, GoogleSearchRetrievalTool, DynamicRetrievalMode } from "@google/generative-ai";
+import { GoogleGenerativeAI, Tool } from "@google/generative-ai";
 
 // Constants for validation
 const MAX_MODEL_LENGTH = 200;
@@ -147,14 +147,10 @@ export async function POST(req: NextRequest) {
             try {
                 console.log(`Attempting decode with model: ${modelName}`);
 
-                // Configure Google Search Retrieval for real-time web data
-                const googleSearchTool: GoogleSearchRetrievalTool = {
-                    googleSearchRetrieval: {
-                        dynamicRetrievalConfig: {
-                            mode: DynamicRetrievalMode.MODE_DYNAMIC,
-                            dynamicThreshold: 0.5, // Search when confidence is below this threshold
-                        }
-                    }
+                // Configure Google Search for real-time web data
+                // Note: Flash models use googleSearch, not googleSearchRetrieval
+                const googleSearchTool = {
+                    googleSearch: {}
                 };
 
                 const generativeModel = genAI.getGenerativeModel({
