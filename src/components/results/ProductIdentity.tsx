@@ -22,7 +22,9 @@ export const ProductIdentity: React.FC<ProductIdentityProps> = ({ identity, dela
                 <div className="flex items-center gap-1.5 text-[8px] uppercase font-black tracking-widest text-white/20">
                     <Tag className="w-3 h-3" /> Brand
                 </div>
-                <div className="text-sm text-white font-bold truncate">{identity.brand}</div>
+                <div className="text-sm text-white font-bold break-words leading-tight" title={identity.brand}>
+                    {identity.brand}
+                </div>
             </motion.div>
 
             <motion.div
@@ -32,7 +34,9 @@ export const ProductIdentity: React.FC<ProductIdentityProps> = ({ identity, dela
                 <div className="flex items-center gap-1.5 text-[8px] uppercase font-black tracking-widest text-white/20">
                     <Box className="w-3 h-3" /> Category
                 </div>
-                <div className="text-sm text-white font-bold truncate">{identity.category}</div>
+                <div className="text-sm text-white font-bold break-words leading-tight" title={identity.category}>
+                    {identity.category}
+                </div>
             </motion.div>
 
             {/* New Fields */}

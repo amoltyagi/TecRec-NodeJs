@@ -42,10 +42,10 @@ export const PriceMeter: React.FC<PriceMeterProps> = ({ indicator, delay = 0 }) 
                     <div className="w-2.5 h-2.5 bg-white rounded-full shadow-[0_0_8px_white] mr-[-4px]" />
                 </motion.div>
             </div>
-            <div className="flex justify-between text-[7px] font-black uppercase tracking-widest text-white/15">
+            <div className="flex justify-between text-[7px] sm:text-[7px] font-black uppercase tracking-widest text-white/15">
                 <span>Value</span>
                 <span>Mid</span>
-                <span>Premium</span>
+                <span>Prem</span>
                 <span>Elite</span>
             </div>
         </motion.div>
