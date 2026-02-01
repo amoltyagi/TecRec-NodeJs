@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI, Tool } from "@google/generative-ai";
+import { GoogleGenerativeAI, Tool, GoogleSearchRetrievalTool, DynamicRetrievalMode } from "@google/generative-ai";
 
 // Constants for validation
 const MAX_MODEL_LENGTH = 200;
@@ -51,7 +51,16 @@ export async function POST(req: NextRequest) {
 
         const systemPrompt = `
       You are TecRec, a premium tech decoder. Identify technology products by model code.
-      Use your grounding to find LATEST 2024/2025/2026 specs, prices (US), & reviews.
+      CRITICAL: You have access to REAL-TIME Google Search. ALWAYS use it for the latest information.
+
+      Your search results contain CURRENT web data from 2024/2025/2026. Use this search data,
+      NOT your training knowledge, which may be outdated.
+
+      Search Workflow:
+      1. First, Google Search the exact model code
+      2. Extract: release date, current US pricing, latest specs, recent reviews
+      3. If product is very new (just announced/launched), say so
+      4. If product is upcoming/rumored, clarify that status
 
       IMPORTANT: Output ONLY raw JSON, no markdown, no code fences.
 
@@ -137,15 +146,25 @@ export async function POST(req: NextRequest) {
         for (const modelName of modelsToTry) {
             try {
                 console.log(`Attempting decode with model: ${modelName}`);
+
+                // Configure Google Search Retrieval for real-time web data
+                const googleSearchTool: GoogleSearchRetrievalTool = {
+                    googleSearchRetrieval: {
+                        dynamicRetrievalConfig: {
+                            mode: DynamicRetrievalMode.MODE_DYNAMIC,
+                            dynamicThreshold: 0.5, // Search when confidence is below this threshold
+                        }
+                    }
+                };
+
                 const generativeModel = genAI.getGenerativeModel({
                     model: modelName,
-                    // Google Search tool configuration - cast to Tool type as SDK doesn't export googleSearch directly
-                    tools: [{ googleSearch: {} } as Tool]
+                    tools: [googleSearchTool as Tool]
                 });
 
                 const result = await generativeModel.generateContent([
                     systemPrompt,
-                    `Decode this tech model using current 2025 web data and US pricing: ${sanitizedModel}`
+                    `Decode this tech model using REAL-TIME Google Search for latest specs, release date, and US pricing: ${sanitizedModel}`
                 ]);
 
                 const rawText = result.response.text();
