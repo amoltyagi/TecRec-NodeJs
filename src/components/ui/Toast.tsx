@@ -19,6 +19,7 @@ interface ToastProps {
 
 const springConfig = { type: "spring", stiffness: 300, damping: 30, mass: 1 } as const;
 
+/** Renders an animated toast with icon, message, and dismiss button. */
 export const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
   const icons = {
     error: <AlertCircle className="w-5 h-5 text-red-400" />,
@@ -61,6 +62,7 @@ interface ToastContainerProps {
   onDismiss: (id: string) => void;
 }
 
+/** Fixed top-right container displaying all active toasts. */
 export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) => {
   return (
     <div className="fixed top-4 right-4 z-50 flex flex-col gap-3 pointer-events-none">
