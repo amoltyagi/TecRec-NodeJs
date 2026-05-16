@@ -62,7 +62,7 @@ interface ToastContainerProps {
   onDismiss: (id: string) => void;
 }
 
-/** Fixed top-right container displaying all active toasts. */
+/** Fix top-right container displaying all active toasts. */
 export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) => {
   return (
     <div className="fixed top-4 right-4 z-50 flex flex-col gap-3 pointer-events-none">
