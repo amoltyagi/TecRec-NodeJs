@@ -1,0 +1,120 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "instructions": [
+    "AGENTS.md",
+    "tecrec_v2_master_prompt.md"
+  ],
+
+  "permission": {
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "todowrite": "allow",
+    "question": "allow",
+    "skill": "allow",
+    "doom_loop": "allow",
+
+    "task": "ask",
+
+    "external_directory": {
+      "*": "ask",
+      "/var/folders/**": "allow"
+    },
+
+    "edit": {
+      "*.env*": "ask",
+      "*.env.local*": "ask",
+      "*.env.production*": "ask",
+      "*.env.development*": "ask",
+      "**/.env*": "ask",
+      ".gitignore": "ask",
+      ".git/config": "deny",
+      "*": "allow"
+    },
+
+    "bash": {
+      "*": "ask",
+      "npm run dev": "allow",
+      "npm run dev *": "allow",
+      "npm run build": "allow",
+      "npm run start": "allow",
+      "npm run lint": "allow",
+      "npm install": "allow",
+      "npm install *": "allow",
+      "npm ci": "allow",
+      "npm test": "allow",
+      "npx *": "ask",
+      "ls *": "allow",
+      "pwd": "allow",
+      "git status": "allow",
+      "git diff": "allow",
+      "git diff --staged": "allow",
+      "git diff --cached": "allow",
+      "git log *": "allow",
+      "git branch": "allow",
+      "git branch *": "allow",
+      "git remote *": "allow",
+      "git stash": "allow",
+      "git stash *": "allow",
+      "git add *": "ask",
+      "git commit *": "ask",
+      "git reset --hard *": "deny",
+      "git reset --hard": "deny",
+      "git push --force*": "deny",
+      "git push --delete*": "deny",
+      "git push origin --delete*": "deny",
+      "git push origin :*": "deny",
+      "git rebase *": "ask",
+      "git clean *": "deny",
+      "git checkout -- *": "ask",
+      "git checkout .": "ask",
+      "rm -rf /*": "deny",
+      "rm -rf /": "deny",
+      "rm -rf ~": "deny",
+      "rm -rf ~/*": "deny",
+      "rm -rf .": "deny",
+      "rm -rf ../*": "deny",
+      "rm -rf *": "ask",
+      "rm *": "ask",
+      "npm publish": "deny",
+      "npm publish *": "deny",
+      "npm unpublish *": "deny",
+      "yarn publish": "deny",
+      "npm deprecate *": "deny",
+      "sudo *": "deny",
+      "chmod 777 *": "deny",
+      "chown *": "deny",
+      "curl * | bash": "deny",
+      "curl * | sh": "deny",
+      "wget * -O - | bash": "deny",
+      "wget * -O - | sh": "deny",
+      "eval *": "deny",
+      "openssl *": "ask",
+      "kill *": "ask",
+      "killall *": "ask",
+      "shutdown *": "deny",
+      "reboot": "deny",
+      "init 0": "deny",
+      "init 6": "deny",
+      "heroku config:set *": "deny",
+      "vercel env add": "deny",
+      "vercel env pull": "deny",
+      "aws s3 rm *": "deny",
+      "aws rds delete-*": "deny",
+      "docker rm *": "ask",
+      "docker rmi *": "ask",
+      "docker system prune": "deny",
+      "docker system prune *": "deny"
+    },
+
+    "repo_clone": "ask"
+  },
+
+  "experimental": {
+    "primary_tools": ["edit"]
+  }
+}
