@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { DecodeResult } from '@/types';
 
 interface ProductRow {
@@ -23,14 +23,18 @@ interface ProductRow {
   updated_at: string;
 }
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_ANON_KEY!;
+let supabase: SupabaseClient | null = null;
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY must be set in environment');
+function getSupabase(): SupabaseClient {
+  if (supabase) return supabase;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY must be set in environment');
+  }
+  supabase = createClient(url, key);
+  return supabase;
 }
-
-export const supabase = createClient(supabaseUrl, supabaseKey);
 
 function slugify(model: string, brand: string): string {
   return `${brand.toLowerCase().replace(/\s+/g, '-')}-${model.toLowerCase().replace(/\s+/g, '-')}`;
@@ -60,19 +64,21 @@ function rowToDecodeResult(row: ProductRow): DecodeResult {
 }
 
 export async function getProductByModel(model: string): Promise<DecodeResult | null> {
-  const { data, error } = await supabase
+  const client = getSupabase();
+  const { data, error } = await client
     .from('products')
     .select('*')
     .eq('model_number', model.toUpperCase().trim())
     .single();
 
   if (error || !data) return null;
-  return rowToDecodeResult(data as ProductRow);
+  return rowToDecodeResult(data as unknown as ProductRow);
 }
 
 export async function saveProduct(model: string, result: DecodeResult): Promise<void> {
   const cleanModel = model.toUpperCase().trim();
-  const existing = await supabase
+  const client = getSupabase();
+  const existing = await client
     .from('products')
     .select('id')
     .eq('model_number', cleanModel)
@@ -92,14 +98,15 @@ export async function saveProduct(model: string, result: DecodeResult): Promise<
   };
 
   if (existing?.data) {
-    await supabase.from('products').update(row).eq('model_number', cleanModel);
+    await client.from('products').update(row).eq('model_number', cleanModel);
   } else {
-    await supabase.from('products').insert({ ...row, search_count: 1 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await client.from('products').insert({ ...row, search_count: 1 } as any);
   }
 }
 
 export async function incrementSearchCount(model: string): Promise<void> {
-  const { error } = await supabase.rpc('increment_search', {
+  const { error } = await getSupabase().rpc('increment_search', {
     target_model: model.toUpperCase().trim(),
   });
   if (error) {
@@ -113,12 +120,13 @@ export async function logSearch(
   source: 'camera' | 'text',
   ipHash: string
 ): Promise<void> {
-  const { error } = await supabase.from('search_history').insert({
+  const { error } = await getSupabase().from('search_history').insert({
     query: query.toUpperCase().trim(),
     product_id: productId,
     source,
     ip_hash: ipHash,
-  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
   if (error) {
     console.error('Failed to log search:', error);
   }
@@ -126,7 +134,7 @@ export async function logSearch(
 
 export async function getDailySearchCount(ipHash: string): Promise<number> {
   const today = new Date().toISOString().split('T')[0];
-  const { count, error } = await supabase
+  const { count, error } = await getSupabase()
     .from('search_history')
     .select('*', { count: 'exact', head: true })
     .eq('ip_hash', ipHash)

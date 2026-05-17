@@ -1,10 +1,15 @@
 import { GoogleGenerativeAI, Tool } from '@google/generative-ai';
 import { DecodeResult } from '@/types';
 
-const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-if (!apiKey) throw new Error('GEMINI_API_KEY or API_KEY missing from environment');
+let _genAI: GoogleGenerativeAI | null = null;
 
-const genAI = new GoogleGenerativeAI(apiKey);
+function getGenAI(): GoogleGenerativeAI {
+  if (_genAI) return _genAI;
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY or API_KEY missing from environment');
+  _genAI = new GoogleGenerativeAI(apiKey);
+  return _genAI;
+}
 
 const DECODE_MODELS = ['gemini-2.0-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest'];
 const SCAN_MODELS = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
@@ -113,6 +118,7 @@ Response JSON Schema:
 
 export async function geminiDecode(model: string): Promise<DecodeResult> {
   let lastError: unknown;
+  const genAI = getGenAI();
 
   for (const modelName of DECODE_MODELS) {
     try {
@@ -149,6 +155,7 @@ export async function geminiDecode(model: string): Promise<DecodeResult> {
 
 export async function geminiScan(imageBase64: string): Promise<string | null> {
   let lastError: unknown;
+  const genAI = getGenAI();
 
   for (const modelName of SCAN_MODELS) {
     try {
