@@ -19,14 +19,14 @@ export const PriceMeter: React.FC<PriceMeterProps> = ({ indicator, delay = 0 }) 
             className="p-5 rounded-[1.5rem] bg-white/5 border border-white/5 relative overflow-hidden"
         >
             <div className="flex justify-between items-end mb-4">
-                <div className="flex items-center gap-1.5 text-[8px] uppercase font-black tracking-[0.2em] text-white/20">
+                <div className="flex items-center gap-1.5 text-[8px] sm:text-[10px] uppercase font-black tracking-[0.2em] text-white/20">
                     <DollarSign className="w-3.5 h-3.5" /> Market
                 </div>
                 <div className="text-right">
-                    <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest block mb-0.5">
+                    <span className="text-[9px] sm:text-[11px] font-black text-emerald-400 uppercase tracking-widest block mb-0.5">
                         {indicator.level}
                     </span>
-                    <span className="text-xl font-bold font-sans text-white tracking-tight">
+                    <span className="text-xl sm:text-2xl font-bold font-sans text-white tracking-tight">
                         {indicator.estimatedPrice}
                     </span>
                 </div>
@@ -42,7 +42,7 @@ export const PriceMeter: React.FC<PriceMeterProps> = ({ indicator, delay = 0 }) 
                     <div className="w-2.5 h-2.5 bg-white rounded-full shadow-[0_0_8px_white] mr-[-4px]" />
                 </motion.div>
             </div>
-            <div className="flex justify-between text-[7px] sm:text-[7px] font-black uppercase tracking-widest text-white/15">
+            <div className="flex justify-between text-[7px] sm:text-[9px] font-black uppercase tracking-widest text-white/15">
                 <span>Value</span>
                 <span>Mid</span>
                 <span>Prem</span>

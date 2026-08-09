@@ -140,7 +140,7 @@ export default function Home() {
   };
 
   return (
-    <div className="relative min-h-dvh w-full flex flex-col items-stretch sm:items-center justify-center overflow-hidden pt-safe pb-safe px-safe sm:p-6 font-sans antialiased">
+    <div className="relative min-h-dvh w-full flex flex-col items-stretch justify-start sm:items-center sm:justify-center overflow-hidden pt-safe pb-safe px-safe sm:p-6 lg:p-10 font-sans antialiased">
       <AnimatePresence mode="wait">
         {!isAnalyzing ? (
           <motion.div
@@ -149,9 +149,9 @@ export default function Home() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 1.05, y: -30 }}
             transition={springConfig}
-            className="w-full max-w-none sm:max-w-xl z-10 flex-1 sm:flex-none flex flex-col items-center"
+            className="w-full max-w-none sm:max-w-2xl z-10 flex-1 sm:flex-none flex flex-col items-center"
           >
-            <div className="liquid-glass specular-highlight w-full flex-1 sm:flex-none rounded-none sm:rounded-[3.5rem] px-6 py-10 sm:p-12 text-center text-white overflow-hidden relative flex flex-col items-center justify-center">
+            <div className="liquid-glass specular-highlight w-full flex-1 sm:flex-none rounded-none sm:rounded-[3.5rem] px-6 py-10 sm:p-12 lg:p-16 text-center text-white overflow-hidden relative flex flex-col items-center justify-center">
               <header className="mb-8 sm:mb-10 w-full">
                 <motion.div
                   initial={{ scale: 0, rotate: -10 }}
@@ -161,10 +161,10 @@ export default function Home() {
                 >
                   <Cpu className="w-8 h-8 sm:w-10 sm:h-10" />
                 </motion.div>
-                <h1 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight leading-tight px-2">
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-4 tracking-tight leading-tight px-2">
                   TecRec <span className="text-emerald-400">Universal</span>
                 </h1>
-                <p className="text-sm sm:text-lg text-white/50 font-light max-w-[280px] sm:max-w-sm mx-auto leading-relaxed">
+                <p className="text-sm sm:text-lg lg:text-xl text-white/50 font-light max-w-[280px] sm:max-w-sm lg:max-w-md mx-auto leading-relaxed">
                   Turn cryptic codes into technical truth. Decode specs, value, and alternatives.
                 </p>
               </header>
@@ -176,7 +176,7 @@ export default function Home() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   autoFocus
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-6 pl-12 sm:pl-14 pr-[6rem] sm:pr-[12rem] text-base sm:text-lg text-white placeholder:text-white/20 outline-none focus:border-emerald-500/40 focus:bg-white/10 transition-all shadow-inner"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-6 pl-12 sm:pl-14 pr-[6rem] sm:pr-[12rem] text-base sm:text-lg lg:text-xl text-white placeholder:text-white/20 outline-none focus:border-emerald-500/40 focus:bg-white/10 transition-all shadow-inner"
                 />
                 <Search className="absolute left-4 sm:left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20 group-focus-within:text-emerald-400 transition-colors" />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 sm:gap-2">
@@ -202,7 +202,7 @@ export default function Home() {
                   className="flex items-center gap-3 px-8 py-4 w-full sm:w-auto rounded-2xl bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-400/30 text-emerald-400 hover:text-white hover:bg-emerald-500/20 hover:border-emerald-400/50 transition-all group active:scale-95 shadow-[0_0_20px_rgba(52,211,153,0.15)]"
                 >
                   <ScanBarcode className="w-5 h-5 group-hover:text-emerald-300 transition-colors shrink-0" />
-                  <span className="font-bold text-[11px] sm:text-xs uppercase tracking-widest truncate">Scan Product Tags in Store</span>
+                  <span className="font-bold text-[11px] sm:text-xs lg:text-sm uppercase tracking-widest truncate">Scan Product Tags in Store</span>
                 </button>
 
                 <div className="flex flex-wrap justify-center gap-2 px-2">
@@ -216,7 +216,7 @@ export default function Home() {
                         setSearchQuery(suggestion);
                         handleDecode(undefined, suggestion);
                       }}
-                      className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest px-3.5 py-2.5 rounded-full border border-white/10 bg-white/5 text-white/30 hover:text-white/70 hover:bg-white/10 transition-all"
+                      className="text-[9px] sm:text-[10px] lg:text-xs font-bold uppercase tracking-widest px-3.5 py-2.5 rounded-full border border-white/10 bg-white/5 text-white/30 hover:text-white/70 hover:bg-white/10 transition-all"
                     >
                       {suggestion}
                     </motion.button>
@@ -232,9 +232,9 @@ export default function Home() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 1.02, y: -20 }}
             transition={springConfig}
-            className="w-full max-w-none sm:max-w-xl z-10 flex-1 sm:flex-none min-h-0 sm:h-auto"
+            className="w-full max-w-none sm:max-w-2xl lg:max-w-5xl z-10 flex-1 sm:flex-none min-h-0 flex flex-col"
           >
-            <div className="liquid-glass specular-highlight rounded-none sm:rounded-[3rem] px-5 py-6 sm:px-10 sm:py-8 text-white h-full flex flex-col relative overflow-hidden">
+            <div className="liquid-glass specular-highlight rounded-none sm:rounded-[3rem] px-5 py-6 sm:p-10 text-white w-full flex-1 sm:flex-none min-h-0 sm:min-h-[38rem] sm:max-h-[85dvh] flex flex-col relative overflow-hidden">
               <AnimatePresence mode="wait">
                 {loading ? (
                   <motion.div
@@ -281,23 +281,27 @@ export default function Home() {
                       <div className="w-10" />
                     </header>
 
-                    <div className="space-y-4 flex-1 custom-scrollbar overflow-y-auto pr-1 pb-4">
-                      {result?.identity && <ProductIdentity identity={result.identity} />}
+                    <div className="flex-1 min-h-0 custom-scrollbar overflow-y-auto pr-1 pb-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-4 lg:gap-8 items-start">
+                        <div className="space-y-4 lg:space-y-5">
+                          {result?.identity && <ProductIdentity identity={result.identity} />}
 
-                      {result?.identity?.priceIndicator && (
-                        <PriceMeter indicator={result.identity.priceIndicator} delay={0.4} />
-                      )}
+                          {result?.identity?.priceIndicator && (
+                            <PriceMeter indicator={result.identity.priceIndicator} delay={0.4} />
+                          )}
+                        </div>
 
-                      {result?.alternatives && (
-                        <AlternativeList
-                          alternatives={result.alternatives}
-                          onSelect={(model) => {
-                            handleDecode(undefined, model);
-                            setSearchQuery(model);
-                          }}
-                          delay={0.6}
-                        />
-                      )}
+                        {result?.alternatives && (
+                          <AlternativeList
+                            alternatives={result.alternatives}
+                            onSelect={(model) => {
+                              handleDecode(undefined, model);
+                              setSearchQuery(model);
+                            }}
+                            delay={0.6}
+                          />
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 )}

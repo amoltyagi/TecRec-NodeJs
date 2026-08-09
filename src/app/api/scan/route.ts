@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { geminiScan, geminiDecode } from '@/lib/ai/gemini';
-import { getProductByModel, saveProduct, logSearch, getDailySearchCount, incrementSearchCount } from '@/lib/db/supabase';
+import { veniceScan, veniceDecode } from '@/lib/ai/venice';
+import { getProductByModel, saveProduct, logSearch, getDailySearchCount, incrementSearchCount } from '@/lib/db/neon';
 
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const FREE_DAILY_LIMIT = 5;
@@ -55,23 +55,23 @@ export async function POST(req: NextRequest) {
     }
 
     // Extract model from image
-    const extractedModel = await geminiScan(image);
+    const extractedModel = await veniceScan(image);
     if (!extractedModel || extractedModel.toLowerCase() === 'none') {
       return NextResponse.json({ error: 'Could not clearly identify a model number. Please try closer or adjust lighting.' }, { status: 422 });
     }
 
     const cleanModel = extractedModel.toUpperCase().trim();
 
-    // Check Supabase first
+    // Check DB cache first
     const existing = await getProductByModel(cleanModel);
     if (existing) {
+      // Cache hits are free: bump analytics only, don't count against the daily AI limit
       await incrementSearchCount(cleanModel);
-      await logSearch(cleanModel, null, 'camera', ipHash);
       return NextResponse.json({ found: true, model: extractedModel, ...existing });
     }
 
-    // Call Gemini AI to decode
-    const decoded = await geminiDecode(cleanModel);
+    // Call Venice AI to decode
+    const decoded = await veniceDecode(cleanModel);
     if (decoded.error) {
       return NextResponse.json({ error: decoded.error, found: true, model: extractedModel }, { status: 502 });
     }
