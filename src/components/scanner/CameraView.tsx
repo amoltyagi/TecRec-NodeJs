@@ -71,13 +71,13 @@ export const CameraView: React.FC<CameraViewProps> = ({ isOpen, onClose, onCaptu
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/90 backdrop-blur-2xl"
+                    className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center pt-safe pb-safe px-safe sm:p-6 bg-black/90 backdrop-blur-2xl"
                 >
                     <motion.div
                         initial={{ scale: 0.9, y: 20 }}
                         animate={{ scale: 1, y: 0 }}
                         exit={{ scale: 0.9, y: 20 }}
-                        className="liquid-glass specular-highlight w-full max-w-[380px] rounded-[2.5rem] overflow-hidden p-6 text-white flex flex-col gap-6"
+                        className="liquid-glass specular-highlight w-full max-w-none sm:max-w-[380px] rounded-none sm:rounded-[2.5rem] overflow-hidden p-6 sm:p-6 text-white flex flex-col gap-6 sm:gap-6"
                     >
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -91,7 +91,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ isOpen, onClose, onCaptu
                             </button>
                         </div>
 
-                        <div className="relative aspect-[4/5] sm:aspect-[4/3] rounded-[1.8rem] overflow-hidden bg-black flex items-center justify-center scanner-frame">
+                        <div className="relative w-full flex-1 min-h-0 sm:flex-none sm:aspect-[4/3] rounded-[1.8rem] overflow-hidden bg-black flex items-center justify-center scanner-frame">
                             <video
                                 ref={videoRef}
                                 autoPlay

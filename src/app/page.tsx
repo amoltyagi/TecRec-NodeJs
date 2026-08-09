@@ -140,7 +140,7 @@ export default function Home() {
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-start sm:justify-center overflow-hidden p-4 sm:p-6 pt-12 sm:pt-6 font-sans antialiased">
+    <div className="relative min-h-dvh w-full flex flex-col items-stretch sm:items-center justify-center overflow-hidden pt-safe pb-safe px-safe sm:p-6 font-sans antialiased">
       <AnimatePresence mode="wait">
         {!isAnalyzing ? (
           <motion.div
@@ -149,9 +149,9 @@ export default function Home() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 1.05, y: -30 }}
             transition={springConfig}
-            className="w-full max-w-[400px] sm:max-w-xl z-10 flex flex-col items-center"
+            className="w-full max-w-none sm:max-w-xl z-10 flex-1 sm:flex-none flex flex-col items-center"
           >
-            <div className="liquid-glass specular-highlight w-full rounded-[2.5rem] sm:rounded-[3.5rem] px-6 py-10 sm:p-12 text-center text-white overflow-hidden relative flex flex-col items-center">
+            <div className="liquid-glass specular-highlight w-full flex-1 sm:flex-none rounded-none sm:rounded-[3.5rem] px-6 py-10 sm:p-12 text-center text-white overflow-hidden relative flex flex-col items-center justify-center">
               <header className="mb-8 sm:mb-10 w-full">
                 <motion.div
                   initial={{ scale: 0, rotate: -10 }}
@@ -232,9 +232,9 @@ export default function Home() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 1.02, y: -20 }}
             transition={springConfig}
-            className="w-full max-w-[400px] sm:max-w-xl z-10 h-[82vh] sm:h-auto"
+            className="w-full max-w-none sm:max-w-xl z-10 flex-1 sm:flex-none min-h-0 sm:h-auto"
           >
-            <div className="liquid-glass specular-highlight rounded-[2rem] sm:rounded-[3rem] px-5 py-6 sm:px-10 sm:py-8 text-white h-full flex flex-col relative overflow-hidden">
+            <div className="liquid-glass specular-highlight rounded-none sm:rounded-[3rem] px-5 py-6 sm:px-10 sm:py-8 text-white h-full flex flex-col relative overflow-hidden">
               <AnimatePresence mode="wait">
                 {loading ? (
                   <motion.div
