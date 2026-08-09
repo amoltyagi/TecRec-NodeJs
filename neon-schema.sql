@@ -1,6 +1,6 @@
 -- ============================================
--- Run this in Supabase SQL Editor:
--- https://supabase.com/dashboard/project/_/sql/new
+-- Run this in the Neon SQL Editor:
+-- https://console.neon.tech -> your project -> SQL Editor
 -- ============================================
 
 -- Products table: persistent storage for every decoded product
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS products (
     slug TEXT NOT NULL UNIQUE,
     brand TEXT NOT NULL,
     category TEXT NOT NULL,
-    key_specs TEXT[] DEFAULT '{}',
+    key_specs JSONB DEFAULT '[]',
     insight TEXT NOT NULL,
     price_indicator JSONB DEFAULT '{}',
     release_window TEXT,
@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 -- Search history: rate limiting + analytics
+-- NOTE: only actual AI decodes are logged here (cache hits are not),
+-- so rows per ip_hash per day = AI usage for the daily limit.
 CREATE TABLE IF NOT EXISTS search_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     query TEXT NOT NULL,
@@ -36,12 +38,3 @@ CREATE INDEX IF NOT EXISTS idx_products_model ON products(model_number);
 CREATE INDEX IF NOT EXISTS idx_products_slug ON products(slug);
 CREATE INDEX IF NOT EXISTS idx_search_history_created ON search_history(created_at);
 CREATE INDEX IF NOT EXISTS idx_search_history_ip ON search_history(ip_hash, created_at);
-
--- RPC: increment search count without overwriting other fields
-CREATE OR REPLACE FUNCTION increment_search(target_model TEXT)
-RETURNS void AS $$
-BEGIN
-  UPDATE products SET search_count = search_count + 1, updated_at = now()
-  WHERE model_number = target_model;
-END;
-$$ LANGUAGE plpgsql;
