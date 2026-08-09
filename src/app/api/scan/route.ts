@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { veniceScan, veniceDecode } from '@/lib/ai/venice';
 import { getProductByModel, saveProduct, logSearch, getDailySearchCount, incrementSearchCount } from '@/lib/db/neon';
+import { getClientIp, hashIp, isBodyTooLarge, sanitizeModelInput } from '@/lib/security';
 
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+// ~7MB: 5MB binary -> ~6.7MB base64 -> small JSON envelope overhead
+const MAX_BODY_BYTES = 7 * 1024 * 1024;
 const FREE_DAILY_LIMIT = 5;
 
 function validateBase64Image(imageData: string): { valid: boolean; error?: string } {
@@ -23,17 +26,12 @@ function validateBase64Image(imageData: string): { valid: boolean; error?: strin
   return { valid: true };
 }
 
-function hashIp(ip: string): string {
-  let hash = 0;
-  for (let i = 0; i < ip.length; i++) {
-    hash = ((hash << 5) - hash) + ip.charCodeAt(i);
-    hash |= 0;
-  }
-  return String(hash);
-}
-
 export async function POST(req: NextRequest) {
   try {
+    if (isBodyTooLarge(req, MAX_BODY_BYTES)) {
+      return NextResponse.json({ error: 'Request too large' }, { status: 413 });
+    }
+
     const { image } = await req.json();
 
     if (!image) {
@@ -45,8 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const ip = req.headers.get('x-forwarded-for') || 'unknown';
-    const ipHash = hashIp(ip);
+    const ipHash = hashIp(getClientIp(req));
 
     // Rate limiting
     const dailyCount = await getDailySearchCount(ipHash);
@@ -60,27 +57,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Could not clearly identify a model number. Please try closer or adjust lighting.' }, { status: 422 });
     }
 
-    const cleanModel = extractedModel.toUpperCase().trim();
+    // The vision model's output is untrusted input: sanitize like any user query
+    const cleanModel = sanitizeModelInput(extractedModel).toUpperCase();
+    if (cleanModel.length === 0) {
+      return NextResponse.json({ error: 'Could not clearly identify a model number. Please try closer or adjust lighting.' }, { status: 422 });
+    }
 
     // Check DB cache first
     const existing = await getProductByModel(cleanModel);
     if (existing) {
       // Cache hits are free: bump analytics only, don't count against the daily AI limit
       await incrementSearchCount(cleanModel);
-      return NextResponse.json({ found: true, model: extractedModel, ...existing });
+      return NextResponse.json({ found: true, model: cleanModel, ...existing });
     }
 
     // Call Venice AI to decode
     const decoded = await veniceDecode(cleanModel);
     if (decoded.error) {
-      return NextResponse.json({ error: decoded.error, found: true, model: extractedModel }, { status: 502 });
+      // Detail stays in server logs (veniceDecode logs per-model); clients get a generic message
+      console.error(`Decode failed for scanned model: ${decoded.error}`);
+      return NextResponse.json({ error: 'Could not decode this model right now. Please try again later.', found: true, model: cleanModel }, { status: 502 });
     }
 
-    // Save to Supabase
+    // Save to DB
     await saveProduct(cleanModel, decoded);
     await logSearch(cleanModel, null, 'camera', ipHash);
 
-    return NextResponse.json({ found: true, model: extractedModel, ...decoded });
+    return NextResponse.json({ found: true, model: cleanModel, ...decoded });
 
   } catch (error) {
     console.error('Scan API Error:', error);

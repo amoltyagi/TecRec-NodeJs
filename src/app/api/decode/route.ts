@@ -1,28 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { veniceDecode } from '@/lib/ai/venice';
 import { getProductByModel, saveProduct, logSearch, getDailySearchCount, incrementSearchCount } from '@/lib/db/neon';
+import { getClientIp, hashIp, isBodyTooLarge, sanitizeModelInput } from '@/lib/security';
 
-const MAX_MODEL_LENGTH = 200;
+const MAX_BODY_BYTES = 8 * 1024; // model strings are <=200 chars; anything bigger is abuse
 const FREE_DAILY_LIMIT = 5;
-
-function sanitizeModelInput(input: string): string {
-  return input
-    .trim()
-    .slice(0, MAX_MODEL_LENGTH)
-    .replace(/[\x00-\x1F\x7F]/g, '');
-}
-
-function hashIp(ip: string): string {
-  let hash = 0;
-  for (let i = 0; i < ip.length; i++) {
-    hash = ((hash << 5) - hash) + ip.charCodeAt(i);
-    hash |= 0;
-  }
-  return String(hash);
-}
 
 export async function POST(req: NextRequest) {
   try {
+    if (isBodyTooLarge(req, MAX_BODY_BYTES)) {
+      return NextResponse.json({ error: 'Request too large' }, { status: 413 });
+    }
+
     const { model: targetModel } = await req.json();
 
     if (!targetModel || typeof targetModel !== 'string') {
@@ -35,8 +24,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Model code cannot be empty' }, { status: 400 });
     }
 
-    const ip = req.headers.get('x-forwarded-for') || 'unknown';
-    const ipHash = hashIp(ip);
+    const ipHash = hashIp(getClientIp(req));
 
     // Rate limiting
     const dailyCount = await getDailySearchCount(ipHash);
@@ -55,10 +43,12 @@ export async function POST(req: NextRequest) {
     // Call Venice AI
     const decoded = await veniceDecode(cleanModel);
     if (decoded.error) {
-      return NextResponse.json(decoded, { status: 502 });
+      // Detail stays in server logs (veniceDecode logs per-model); clients get a generic message
+      console.error(`Decode failed for model: ${decoded.error}`);
+      return NextResponse.json({ error: 'Could not decode this model right now. Please try again later.' }, { status: 502 });
     }
 
-    // Save to Supabase
+    // Save to DB
     await saveProduct(cleanModel, decoded);
     await logSearch(cleanModel, null, 'text', ipHash);
 

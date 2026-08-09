@@ -31,6 +31,7 @@
 | `VENICE_DECODE_MODEL` | Optional override, default `zai-org-glm-4.7` |
 | `VENICE_SCAN_MODEL` | Optional override, default `qwen3-vl-235b-a22b` |
 | `DATABASE_URL` | Neon pooled Postgres connection string |
+| `IP_HASH_SALT` | Optional salt for rate-limit IP hashes |
 
 ## Architecture / data flow
 
@@ -46,6 +47,26 @@ Client (scan text / camera image)
 
 Rate limit: **5 AI decodes per day per IP** (counted via `search_history`,
 which only logs actual AI calls — cache hits don't consume the limit).
+
+## Security
+
+- **`src/lib/security.ts`** — shared: `sanitizeModelInput` (200-char cap + control-char
+  strip; applied to typed queries AND untrusted vision-model output), `getClientIp`
+  (trusted `x-vercel-forwarded-for` first, `x-forwarded-for` fallback),
+  `hashIp` (SHA-256 + optional `IP_HASH_SALT`), `isBodyTooLarge` (pre-JSON-parse
+  `Content-Length` guard: 8KB decode / 7MB scan).
+- **Error handling:** upstream AI/DB error details are logged server-side only;
+  clients always get generic messages (no internal leakage).
+- **Headers** (`next.config.ts`): CSP (`default-src 'self'`, `object-src 'none'`,
+  `frame-ancestors 'none'`; `unsafe-inline` scripts required by Next inline
+  bootstrap — nonce-based CSP is a future step), `X-Content-Type-Options`,
+  `X-Frame-Options: DENY`, `Referrer-Policy`, HSTS (prod), and
+  `Permissions-Policy` with `camera=(self)` for the scanner.
+- **Accepted risks (documented, not fixed):** rate-limit check-then-log race
+  (concurrent requests can exceed 5/day slightly; bounded impact); IP-based
+  limiting is inherently bypassable via IP rotation; off-Vercel the client IP
+  header is client-controlled.
+
 
 ## Key files
 
@@ -75,6 +96,17 @@ which only logs actual AI calls — cache hits don't consume the limit).
 - **Tailwind 4 note:** configure theme in `globals.css` via `@theme inline`, not a config file.
 
 ## Recent changes
+
+### 2026-08-09 — Security hardening pass
+- New `src/lib/security.ts`: shared input sanitizer (now also applied to
+  vision-model scan output), trusted client-IP extraction, SHA-256 IP hashing
+  (replaces colliding 32-bit hash), pre-parse body-size guards.
+- Error leakage fixed: upstream AI error details no longer returned to clients.
+- Security headers in `next.config.ts` (CSP, nosniff, DENY framing, HSTS,
+  Referrer-Policy, Permissions-Policy with `camera=(self)`).
+- AI-provided `amazonLink` only opened when `https:` (+ `noopener,noreferrer`).
+- `next` 16.1.1 → 16.3.0 (+ `eslint-config-next`): fixes all npm-audit highs.
+  `npm audit` clean.
 
 ### 2026-08-09 — Venice AI + Neon migration & desktop layout
 - **AI:** Gemini removed; `src/lib/ai/venice.ts` calls Venice chat completions via
