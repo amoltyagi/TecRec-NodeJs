@@ -139,6 +139,21 @@ export default function Home() {
     setResult(null);
   };
 
+  // Deep link support: /?q=MODEL pre-fills and auto-decodes.
+  // Used by SEO product pages linking alternatives back into live decodes.
+  const deepLinkHandledRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkHandledRef.current) return;
+    deepLinkHandledRef.current = true;
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q) {
+      window.history.replaceState({}, '', '/');
+      setSearchQuery(q);
+      handleDecode(undefined, q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="relative min-h-dvh w-full flex flex-col items-stretch justify-start sm:items-center sm:justify-center overflow-hidden pt-safe pb-safe px-safe sm:p-6 lg:p-10 font-sans antialiased">
       <AnimatePresence mode="wait">

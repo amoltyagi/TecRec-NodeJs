@@ -32,6 +32,7 @@
 | `VENICE_SCAN_MODEL` | Optional override, default `qwen3-vl-235b-a22b` |
 | `DATABASE_URL` | Neon pooled Postgres connection string |
 | `IP_HASH_SALT` | Optional salt for rate-limit IP hashes |
+| `NEXT_PUBLIC_SITE_URL` | Canonical origin (sitemap, robots, OG, canonical tags) |
 
 ## Architecture / data flow
 
@@ -43,6 +44,12 @@ Client (scan text / camera image)
                       Neon lookup (cache product)
                           ├─ hit  → return, increment search_count (free, not rate-limited)
                           └─ miss → veniceDecode() → saveProduct() → logSearch() → return
+
+SEO: /product/[slug] — ISR (24h revalidate), server-rendered from Neon cache,
+     JSON-LD Product schema, canonical URLs. /sitemap.xml (top 1000 by
+     search_count) + /robots.txt auto-generated. Alternatives on product pages
+     link to /?q=BRAND+MODEL which auto-decodes on the home page.
+     Requires NEXT_PUBLIC_SITE_URL for absolute URLs.
 ```
 
 Rate limit: **5 AI decodes per day per IP** (counted via `search_history`,
@@ -72,7 +79,9 @@ which only logs actual AI calls — cache hits don't consume the limit).
 
 | Path | Responsibility |
 |------|----------------|
-| `src/app/page.tsx` | Single-page UI: home → analyzing → result states |
+| `src/app/page.tsx` | Single-page UI: home → analyzing → result states (`/?q=` deep link) |
+| `src/app/product/[slug]/page.tsx` | ISR SEO page per cached product + JSON-LD |
+| `src/app/sitemap.ts` / `robots.ts` | Sitemap from Neon slugs, robots directives |
 | `src/app/layout.tsx` | Root layout, metadata, **viewport config** |
 | `src/app/api/decode/route.ts` | Text decode: rate-limit → DB → Venice → save |
 | `src/app/api/scan/route.ts` | Camera decode: base64 validation → vision → decode |
@@ -96,6 +105,16 @@ which only logs actual AI calls — cache hits don't consume the limit).
 - **Tailwind 4 note:** configure theme in `globals.css` via `@theme inline`, not a config file.
 
 ## Recent changes
+
+### 2026-08-13 — SEO product pages
+- `/product/[slug]`: server-rendered ISR pages (24h revalidate) built from the
+  Neon product cache — H1 brand+model, reused `ProductIdentity`/`PriceMeter`
+  client islands, alternatives as crawlable links to `/?q=...`, JSON-LD
+  `Product` schema (with `Offer` when price parses), canonical + OG metadata,
+  proper 404 status for unknown slugs, AI-accuracy disclaimer.
+- `/sitemap.xml` (top 1000 products by search_count) and `/robots.txt`;
+  `metadataBase` + new optional env `NEXT_PUBLIC_SITE_URL`.
+- Home page auto-decodes `/?q=MODEL` deep links (query param consumed + URL cleaned).
 
 ### 2026-08-09 — Security hardening pass
 - New `src/lib/security.ts`: shared input sanitizer (now also applied to
