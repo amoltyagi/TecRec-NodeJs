@@ -73,6 +73,39 @@ export async function getProductByModel(model: string): Promise<DecodeResult | n
   return rowToDecodeResult(rows[0]);
 }
 
+export interface ProductPageData {
+  model: string;
+  result: DecodeResult;
+  searchCount: number;
+  updatedAt: string;
+}
+
+export async function getProductBySlug(slug: string): Promise<ProductPageData | null> {
+  const rows = (await getSql()`
+    SELECT * FROM products
+    WHERE slug = ${slug.toLowerCase().trim()}
+    LIMIT 1
+  `) as unknown as ProductRow[];
+
+  if (!rows || rows.length === 0) return null;
+  const row = rows[0];
+  return {
+    model: row.model_number,
+    result: rowToDecodeResult(row),
+    searchCount: row.search_count,
+    updatedAt: row.updated_at,
+  };
+}
+
+/** For sitemap generation: most-searched products first. */
+export async function getProductSlugs(limit = 1000): Promise<{ slug: string; updated_at: string }[]> {
+  return (await getSql()`
+    SELECT slug, updated_at FROM products
+    ORDER BY search_count DESC
+    LIMIT ${limit}
+  `) as unknown as { slug: string; updated_at: string }[];
+}
+
 export async function saveProduct(model: string, result: DecodeResult): Promise<void> {
   const cleanModel = model.toUpperCase().trim();
   const brand = result.identity?.brand || 'Unknown';

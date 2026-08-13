@@ -18,6 +18,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: "TecRec Universal",
   description: "Universal Tech Decoder and Scanner",
   icons: {
