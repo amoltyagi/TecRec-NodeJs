@@ -3,7 +3,7 @@
 
   "instructions": [
     "AGENTS.md",
-    "tecrec_v2_master_prompt.md"
+    "docs/archive/spec-v2.md"
   ],
 
   "permission": {
@@ -20,23 +20,22 @@
 
     "task": "allow",
 
-    "external_directory": {
-      "*": "allow"
-    },
+    // Do not allow the agent to touch paths outside the project by default.
+    "external_directory": "ask",
 
+    // Catch-all first, then the specific denies: secret files must never be
+    // read into a model prompt or modified by an agent.
     "edit": {
-      "*.env*": "allow",
-      "*.env.local*": "allow",
-      "*.env.production*": "allow",
-      "*.env.development*": "allow",
-      "**/.env*": "allow",
-      ".gitignore": "allow",
-      ".git/config": "deny",
-      "*": "allow"
+      "*": "allow",
+      "**/.env*": "deny",
+      "*.env*": "deny",
+      ".env*": "deny",
+      ".git/config": "deny"
     },
 
+    // Destructive commands stay denied; everything else requires approval.
     "bash": {
-      "*": "allow",
+      "*": "ask",
       "git reset --hard *": "deny",
       "git reset --hard": "deny",
       "git push --force*": "deny",

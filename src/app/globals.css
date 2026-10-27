@@ -8,16 +8,32 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: 'Plus Jakarta Sans', sans-serif;
+  /*
+   * next/font exposes the self-hosted family as a CSS variable on <body>.
+   * Reference it instead of hardcoding 'Plus Jakarta Sans': a hardcoded family
+   * name bypasses the hashed @font-face and the font silently fails to load.
+   */
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
   margin: 0;
   padding: 0;
-  font-family: var(--font-sans);
+  /*
+   * Resolve the font variable directly here as well: with `@theme inline` the
+   * theme variable is inlined into utilities rather than necessarily emitted at
+   * :root, so `var(--font-sans)` is not guaranteed to resolve on its own.
+   */
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   overflow-x: hidden;
   background-color: var(--background);
   color: var(--foreground);
+}
+
+/* Visible keyboard focus without changing the glass look */
+:focus-visible {
+  outline: 2px solid rgba(52, 211, 153, 0.65);
+  outline-offset: 2px;
 }
 
 /* Safe-area helpers (notches / home indicator) */
@@ -48,6 +64,7 @@ body {
 
 /* Liquid Glass Effect */
 .liquid-glass {
+  -webkit-backdrop-filter: blur(25px) saturate(190%);
   backdrop-filter: blur(25px) saturate(190%);
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -94,4 +111,30 @@ body {
 @keyframes scan {
   0%, 100% { top: 15%; opacity: 0; }
   50% { top: 85%; opacity: 1; }
+}
+
+/*
+ * Respect the OS "reduce motion" preference (WCAG 2.3.3): kill decorative
+ * CSS animation/motion for users who ask for it. framer-motion is handled
+ * separately by <MotionConfig reducedMotion="user"> in the root layout.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .aurora-bg {
+    animation: none;
+  }
+
+  .scanner-line {
+    animation: none;
+    top: 50%;
+    opacity: 1;
+  }
 }
