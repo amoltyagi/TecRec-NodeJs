@@ -13,7 +13,10 @@ const csp = [
   "font-src 'self' data:",
   `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
   "media-src 'self' blob:",
+  "worker-src 'self'",
+  "manifest-src 'self'",
   "object-src 'none'",
+  "frame-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
@@ -24,13 +27,17 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // Ignored over plain HTTP (localhost dev); Vercel serves HTTPS in prod.
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+  { key: "X-DNS-Prefetch-Control", value: "off" },
+  // Ignored over plain HTTP (localhost dev); the host serves HTTPS in prod.
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
   // camera is required for the scanner (self only); everything else denied.
   { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=()" },
 ];
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

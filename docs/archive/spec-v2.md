@@ -1,5 +1,14 @@
 # Master Context: TecRec v2
 
+> **⛔ SUPERSEDED — ARCHIVED FOR REFERENCE ONLY (do not treat as current).**
+>
+> This is the original v2 product specification, kept for historical context.
+> The implemented stack has since diverged from it in several ways (framework
+> version, database, caching, AI provider, rate limiting, SEO pages). See the
+> repo-root `README.md` and `AGENTS.md` for the current architecture. References
+> to the former AI providers have been removed from this archived copy during
+> the repository de-branding; the original wording described a different stack.
+
 > **Instructions for the AI:** 
 > You are an expert Full Stack Engineer and Systems Architect specializing in Next.js, AI integration, and Mobile-First design. 
 >
@@ -45,8 +54,9 @@ Use **Capacitor** to wrap the web app into native shells.
 - **Vercel KV (Redis)**: Caching layer (TTL: 7 days)
 
 ### AI Layer
-- **Primary:** Google Gemini 2.0 Flash (`gemini-2.0-flash`) with Google Search grounding.
-- **Fallback:** OpenAI `gpt-4o-mini` + Tavily.
+- **Primary:** a hosted chat-completions model with live web-search grounding
+  (the original spec named a specific vendor; removed during de-branding).
+- **Fallback:** a second chat-completions model plus an external search API.
 
 ## 3. System Architecture
 
@@ -73,8 +83,8 @@ Use **Capacitor** to wrap the web app into native shells.
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │                   SERVICE LAYER                          │   │
 │  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────────┐ │   │
-│  │  │ Gemini  │  │ OpenAI  │  │ Tavily  │  │ Supabase DB │ │   │
-│  │  │ (Primary)│  │(Fallback)│  │ (Search)│  │ (Storage)   │ │   │
+│  │  │ AI      │  │ AI      │  │ Search  │  │ Supabase DB │ │   │
+│  │  │(Primary)│  │(Fallback)│ │  (Search)│  │ (Storage)   │ │   │
 │  │  └─────────┘  └─────────┘  └─────────┘  └─────────────┘ │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                              ▲                                  │
@@ -135,7 +145,7 @@ interface SearchHistory {
 
 ### 6.1 Camera Scanner
 - **Input:** Base64 JPEG
-- **AI Model:** Gemini 2.0 Flash (Vision)
+- **AI Model:** multimodal chat-completions model (vision)
 - **Output:** Extracted model number string
 - **Error Handling:** Retry 2x -> Manual prompt
 
@@ -208,7 +218,7 @@ tecrec-v2/
 │   │   ├── scanner/CameraView.tsx
 │   │   └── results/ProductIdentity.tsx
 │   ├── lib/
-│   │   ├── ai/gemini.ts
+│   │   ├── ai/provider.ts
 │   │   ├── db/supabase.ts
 │   │   └── cache/kv.ts
 │   └── types/index.ts

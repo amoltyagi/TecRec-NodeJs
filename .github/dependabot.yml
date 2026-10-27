@@ -1,0 +1,44 @@
+# Keep dependencies patched. The app itself pins one framework family plus a
+# handful of UI libraries, so a weekly grouped PR is enough signal without noise.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # Framework + its eslint config must move together.
+      next:
+        patterns:
+          - next
+          - eslint-config-next
+      react:
+        patterns:
+          - react
+          - react-dom
+          - "@types/react"
+          - "@types/react-dom"
+      tooling:
+        dependency-type: development
+        exclude-patterns:
+          - next
+          - eslint-config-next
+    commit-message:
+      prefix: "deps"
+    ignore:
+      # Major upgrades are reviewed deliberately, not auto-proposed.
+      - dependency-name: next
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react-dom
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"

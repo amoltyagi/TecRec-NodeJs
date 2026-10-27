@@ -1,5 +1,5 @@
 export interface PriceIndicator {
-    level: string; // "Value", "Mid-Range", "Premium", "Elite"
+    level: string; // "Value" | "Mid-Range" | "Premium" | "Elite"
     percent: number; // 0-100 value for the meter
     estimatedPrice: string; // e.g., "$1,299"
 }
@@ -25,5 +25,15 @@ export interface DecodeResult {
     identity?: TechIdentity;
     alternatives?: AlternativeModel[];
     error?: string;
-    sources?: Record<string, unknown>[];
 }
+
+/** `/api/decode` response: a validated result plus its canonical page slug. */
+export type DecodeResponse = DecodeResult & {
+    slug?: string;
+};
+
+/** `/api/scan` success response. */
+export type ScanResponse = DecodeResponse & {
+    found: true;
+    model: string;
+};

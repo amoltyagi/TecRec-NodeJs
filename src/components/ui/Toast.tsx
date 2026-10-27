@@ -22,9 +22,9 @@ const springConfig = { type: "spring", stiffness: 300, damping: 30, mass: 1 } as
 /** Renders an animated toast with icon, message, and dismiss button. */
 export const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
   const icons = {
-    error: <AlertCircle className="w-5 h-5 text-red-400" />,
-    success: <CheckCircle2 className="w-5 h-5 text-emerald-400" />,
-    info: <Info className="w-5 h-5 text-blue-400" />,
+    error: <AlertCircle className="w-5 h-5 text-red-400" aria-hidden="true" />,
+    success: <CheckCircle2 className="w-5 h-5 text-emerald-400" aria-hidden="true" />,
+    info: <Info className="w-5 h-5 text-blue-400" aria-hidden="true" />,
   };
 
   const borders = {
@@ -39,6 +39,10 @@ export const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: 50, scale: 0.95 }}
       transition={springConfig}
+      // Errors are announced assertively, confirmations politely.
+      role={toast.type === 'error' ? 'alert' : 'status'}
+      aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
+      aria-atomic="true"
       className={`liquid-glass specular-highlight rounded-2xl px-5 py-4 text-white flex items-start gap-3 min-w-[300px] max-w-[400px] border ${borders[toast.type]} shadow-lg`}
     >
       <div className="shrink-0 mt-0.5">
@@ -48,10 +52,12 @@ export const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
         {toast.message}
       </p>
       <button
+        type="button"
         onClick={() => onDismiss(toast.id)}
-        className="shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors text-white/40 hover:text-white"
+        aria-label="Dismiss notification"
+        className="shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors text-white/60 hover:text-white"
       >
-        <X className="w-4 h-4" />
+        <X className="w-4 h-4" aria-hidden="true" />
       </button>
     </motion.div>
   );
@@ -65,7 +71,12 @@ interface ToastContainerProps {
 /** Fix top-right container displaying all active toasts. */
 export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) => {
   return (
-    <div className="fixed z-50 flex flex-col gap-3 pointer-events-none pr-safe" style={{ top: "calc(env(safe-area-inset-top) + 1rem)", right: "1rem" }}>
+    <div
+      role="region"
+      aria-label="Notifications"
+      className="fixed z-50 flex flex-col gap-3 pointer-events-none pr-safe"
+      style={{ top: "calc(env(safe-area-inset-top) + 1rem)", right: "1rem" }}
+    >
       <AnimatePresence mode="popLayout">
         {toasts.map((toast) => (
           <div key={toast.id} className="pointer-events-auto">
