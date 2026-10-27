@@ -400,7 +400,7 @@ Responses:
 5. Set the remaining variables from the table above. At minimum:
    `AI_API_KEY`, `AI_API_URL`, `DATABASE_URL`, `IP_HASH_SALT`; optionally
    `AI_*` overrides, quota limits, `AMAZON_AFFILIATE_TAG`, `ADMIN_TOKEN`.
-6. Deploy. Optional: see `.agent/workflows/deploy-vercel.md` for a CLI flow.
+6. Deploy (`vercel --prod`, or merge to `main` if the repo is connected).
 7. Smoke-test: decode a product, open its `/product/[slug]` page, check
    `/sitemap.xml`, `/robots.txt` and `/manifest.webmanifest`.
 
@@ -443,7 +443,6 @@ check does not apply there).
 
 ```text
 .
-├── .agent/workflows/          # agent/deploy runbooks
 ├── .github/workflows/ci.yml   # lint + typecheck + test + build
 ├── docs/archive/spec-v2.md    # original product spec (superseded)
 ├── migrations/                # idempotent SQL migrations for existing DBs

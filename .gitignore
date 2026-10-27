@@ -43,3 +43,7 @@ current tasks/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local agent tooling config (never commit permissions/tooling setup)
+opencode.jsonc
+.agent/

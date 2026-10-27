@@ -99,6 +99,9 @@ export default function Home() {
     event?.preventDefault();
     const modelToUse = (overrideModel ?? searchQuery).trim().slice(0, MAX_MODEL_LENGTH);
     if (!modelToUse) return;
+    // A model supplied programmatically (deep link, alternative, suggestion) is
+    // also what the user is "searching for" - reflect it in the input.
+    if (overrideModel !== undefined) setSearchQuery(modelToUse);
 
     // Ignore a duplicate submit of the model that is already in flight; a
     // different model supersedes it (and aborts the old request below).
@@ -314,14 +317,22 @@ export default function Home() {
   // the handled-flag prevents a retry, leaving an empty result shell.
   const deepLinkHandledRef = useRef(false);
   useEffect(() => {
-    if (deepLinkHandledRef.current) return;
-    deepLinkHandledRef.current = true;
     const q = new URLSearchParams(window.location.search).get('q');
-    if (q) {
-      window.history.replaceState({}, '', '/');
-      setSearchQuery(q.slice(0, MAX_MODEL_LENGTH));
+    if (!q || deepLinkHandledRef.current) return;
+
+    window.history.replaceState({}, '', '/');
+
+    // Deferred so the URL is read during mount but the decode (which updates
+    // state and starts a request) does not run synchronously inside the effect.
+    // The ref guard moves into the callback: under StrictMode the effect runs
+    // twice, and only the surviving timer may fire.
+    const timer = setTimeout(() => {
+      if (deepLinkHandledRef.current) return;
+      deepLinkHandledRef.current = true;
       handleDecode(undefined, q);
-    }
+    }, 0);
+
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
