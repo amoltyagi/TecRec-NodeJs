@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/context/ToastContext";
+import { getSiteUrl } from "@/lib/env";
 import { MotionProvider } from "@/components/ui/MotionProvider";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -23,7 +24,9 @@ const SITE_DESCRIPTION =
   "Decode any tech product from its model code or a photo of the label — specs, release timing, market pricing and alternatives in seconds.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
+  // Same resolver as robots.txt/sitemap.xml, so canonical, OG and crawler URLs
+  // can never disagree (and never fall back to localhost in production).
+  metadataBase: new URL(getSiteUrl()),
   title: SITE_NAME,
   description: SITE_DESCRIPTION,
   alternates: {
