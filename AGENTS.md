@@ -71,7 +71,7 @@ for local development; `.env.example` is the documented contract.
 | `IP_HASH_SALT` | recommended | static fallback | Salt for SHA-256 IP hashes |
 | `AI_DAILY_LIMIT_PER_IP` | no | `5` | Paid AI calls allowed per hashed IP per UTC day |
 | `AI_GLOBAL_DAILY_LIMIT` | no | `500` | Global paid AI calls per UTC day (circuit breaker → 503) |
-| `NEXT_PUBLIC_SITE_URL` | prod | localhost / `VERCEL_URL` | Canonical origin for canonical tags, sitemap, robots, OG. **Vercel production builds fail if unset.** |
+| `NEXT_PUBLIC_SITE_URL` | no | derived on Vercel | Canonical origin for canonical tags, sitemap, robots, OG. Resolution: this var, then `VERCEL_PROJECT_PRODUCTION_URL`, then `VERCEL_URL`, then localhost. Set it explicitly for a **custom domain**; a production build still fails if no origin can be derived at all. |
 | `AMAZON_AFFILIATE_TAG` | no | — | Appended as `tag=` to server-built Amazon search links |
 | `ADMIN_TOKEN` | no | — | Enables `DELETE /api/admin/product`; unset ⇒ route returns 404 |
 

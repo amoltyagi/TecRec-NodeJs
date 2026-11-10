@@ -130,22 +130,35 @@ export function getGlobalDailyLimit(): number {
 /**
  * Canonical public origin, used for canonical tags, sitemap and robots.
  *
- * Deliberately fails loudly on a Vercel production build instead of silently
- * shipping `http://localhost:3000` URLs to search engines - that failure mode is
- * invisible in the UI but quietly de-indexes every page.
+ * Resolution order:
+ *   1. `NEXT_PUBLIC_SITE_URL` - explicit configuration, wins (custom domains).
+ *   2. `VERCEL_PROJECT_PRODUCTION_URL` - supplied automatically by the platform
+ *      and always points at the production domain, so a deploy never depends on
+ *      manual configuration to emit correct canonical/sitemap/robots URLs.
+ *   3. `VERCEL_URL` - the current deployment's URL (preview fallback).
+ *   4. `http://localhost:3000` for local builds.
+ *
+ * It still fails loudly rather than silently shipping `localhost` URLs to search
+ * engines, because that failure mode is invisible in the UI but quietly
+ * de-indexes every page.
  */
 export function getSiteUrl(): string {
   const configured = read('NEXT_PUBLIC_SITE_URL');
   if (configured) return configured.replace(/\/+$/, '');
+
+  const projectProductionUrl = read('VERCEL_PROJECT_PRODUCTION_URL');
+  if (projectProductionUrl) {
+    return `https://${projectProductionUrl.replace(/^https?:\/\//, '')}`;
+  }
+
+  const vercelUrl = read('VERCEL_URL');
+  if (vercelUrl) return `https://${vercelUrl.replace(/^https?:\/\//, '')}`;
 
   if (read('VERCEL_ENV') === 'production') {
     throw new Error(
       'NEXT_PUBLIC_SITE_URL must be set for production deployments: it is used for canonical URLs, the sitemap and robots.txt.',
     );
   }
-
-  const vercelUrl = read('VERCEL_URL');
-  if (vercelUrl) return `https://${vercelUrl.replace(/^https?:\/\//, '')}`;
 
   return LOCAL_SITE_URL;
 }

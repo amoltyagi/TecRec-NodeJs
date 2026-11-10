@@ -211,7 +211,7 @@ only; `NEXT_PUBLIC_SITE_URL` is the single public value.
 | `IP_HASH_SALT` | recommended | static fallback | Salt for SHA-256 client-IP hashes; set a unique random value in production (the server logs a warning when it is missing in production). |
 | `AI_DAILY_LIMIT_PER_IP` | no | `5` | Paid AI calls allowed per hashed IP per UTC day. |
 | `AI_GLOBAL_DAILY_LIMIT` | no | `500` | Global paid AI calls per UTC day (circuit breaker; API returns 503 when exhausted). |
-| `NEXT_PUBLIC_SITE_URL` | prod | `http://localhost:3000` (`VERCEL_URL` on previews) | Canonical origin for canonical tags, sitemap, robots and OG metadata. **Vercel production builds fail if unset.** |
+| `NEXT_PUBLIC_SITE_URL` | no | derived on Vercel | Canonical origin for canonical tags, sitemap, robots and OG metadata. Optional on Vercel: it falls back to `VERCEL_PROJECT_PRODUCTION_URL`, then `VERCEL_URL`, then `http://localhost:3000`. Set it when you serve from a **custom domain**. |
 | `AMAZON_AFFILIATE_TAG` | no | — | Appended as `tag=` to server-built Amazon search links. Empty = plain links. |
 | `ADMIN_TOKEN` | no | — | When set, enables `DELETE /api/admin/product` (bearer token). When unset the admin route returns 404. |
 
@@ -392,7 +392,9 @@ Responses:
 2. Create the schema: run `neon-schema.sql` on a fresh database, or
    `migrations/001_hardening.sql` on an existing one.
 3. Import the repository into Vercel (framework preset: Next.js; Node 22).
-4. **Set `NEXT_PUBLIC_SITE_URL` before deploying.** It is read during the
+4. **Optional: set `NEXT_PUBLIC_SITE_URL`.** On Vercel it is derived from the
+   project's production domain automatically, so you only need it for a custom
+   domain. If no origin can be determined at all, the build fails on purpose. It is read during the
    build (robots/sitemap/canonical metadata) and the app **fails the build
    loudly if it is missing on Vercel production**, rather than silently
    shipping `http://localhost:3000` URLs to search engines. Set it to the exact
