@@ -1,7 +1,7 @@
 # TecRec Universal — Agent & Contributor Guide
 
 > Tech-product decoder: enter a model code (or scan a product label) and get back
-> identity, specs, release window, US market price tier, and alternatives — powered
+> identity, specs, release window, price tier, and alternatives — powered
 > by a hosted chat-completions AI provider, persisted in Neon Postgres.
 >
 > **Sources of truth**
@@ -65,15 +65,16 @@ for local development; `.env.example` is the documented contract.
 | `AI_SCAN_MODEL` | no | `qwen3-vl-235b-a22b` | Primary vision/scan model |
 | `AI_DECODE_FALLBACKS` | no | built-in | Extra comma-separated decode fallbacks (appended after defaults) |
 | `AI_SCAN_FALLBACKS` | no | built-in | Extra comma-separated scan fallbacks (appended after defaults) |
-| `AI_EXTRA_BODY_JSON` | no | — | JSON object merged into the primary model's request body (provider-specific features, e.g. live web search). Invalid JSON is ignored + logged |
+| `AI_EXTRA_BODY_JSON` | no | — | JSON object merged into the primary model's request body (provider-specific features, e.g. live web search). Invalid JSON is ignored + logged. Unset ⇒ one-time server-log warning that decoding is ungrounded |
 | `AI_TIMEOUT_MS` | no | `25000` | Request timeout, clamped to 3000–60000 |
 | `DATABASE_URL` | yes | — | Neon pooled Postgres connection string |
+| `PRODUCT_TTL_DAYS` | no | `90` | Days a cached decode is served before re-decoding; clamped 1–365. Also controls the SEO stale/`noindex` window |
 | `IP_HASH_SALT` | recommended | static fallback | Salt for SHA-256 IP hashes |
 | `AI_DAILY_LIMIT_PER_IP` | no | `5` | Paid AI calls allowed per hashed IP per UTC day |
 | `AI_GLOBAL_DAILY_LIMIT` | no | `500` | Global paid AI calls per UTC day (circuit breaker → 503) |
 | `NEXT_PUBLIC_SITE_URL` | no | derived on Vercel | Canonical origin for canonical tags, sitemap, robots, OG. Resolution: this var, then `VERCEL_PROJECT_PRODUCTION_URL`, then `VERCEL_URL`, then localhost. Set it explicitly for a **custom domain**; a production build still fails if no origin can be derived at all. |
 | `AMAZON_AFFILIATE_TAG` | no | — | Appended as `tag=` to server-built Amazon search links |
-| `ADMIN_TOKEN` | no | — | Enables `DELETE /api/admin/product`; unset ⇒ route returns 404 |
+| `ADMIN_TOKEN` | no | — | Enables `DELETE /api/admin/product` and `POST /api/admin/refresh`; unset ⇒ both routes return 404 |
 
 `VERCEL_ENV` / `VERCEL_URL` are supplied by the platform.
 
@@ -88,18 +89,24 @@ Client (home decoder / camera modal)
   JSON content-type + same-origin checks
   → streaming body cap (8 KB)
   → validate + sanitize model code
-  → cache lookup (products fresh for 90 days)
+  → canonical cache key (datasheet canonical name if covered, else model code)
+  → cache lookup (canonical key first, then original code for legacy rows;
+    fresh for PRODUCT_TTL_DAYS; default 90)
       ├─ HIT  → increment search_count, return cached result (NO quota used)
-      └─ MISS → atomic quota reserve in ai_quota (UTC-day window)
-                 ├─ per-IP limit exhausted → 429 + Retry-After
-                 ├─ global budget exhausted → 503 + Retry-After
-                 │  (the per-IP unit already reserved stays consumed)
-                 └─ reserved (reserved calls count even if the AI call fails)
-                    → AI decode via chat-completions API
-                    → normalize/validate decoded payload
-                    → upsert products row
-                    → log successful decode in search_history
-                    → return result
+      └─ MISS → verified datasheet hit?
+                 ├─ YES → build/validate, save under canonical name, return
+                 │        (NO AI call, NO quota)
+                 └─ NO  → atomic quota reserve in ai_quota (UTC-day window)
+                            ├─ per-IP limit exhausted → 429 + Retry-After
+                            ├─ global budget exhausted → 503 + Retry-After
+                            │  (the per-IP unit already reserved stays consumed)
+                            └─ reserved (reserved calls count even if the AI call fails)
+                               → AI decode via chat-completions API
+                               → normalize/validate decoded payload
+                               → applyDatasheet overlay
+                               → upsert products row
+                               → log successful decode in search_history
+                               → return result
 
 /api/scan (final order):
   JSON content-type + same-origin checks
@@ -111,16 +118,19 @@ Client (home decoder / camera modal)
       └─ global budget → 503 + Retry-After
   → vision model extracts model number
   → sanitize extracted string (untrusted model output)
-  → cache lookup
+  → canonical cache key (datasheet canonical name if covered, else model code)
+  → cache lookup (canonical key first, then original code for legacy rows)
       ├─ HIT  → return cached product (unit already consumed by the scan)
-      └─ MISS → AI decode → validate → save → return
+      └─ MISS → decode: datasheet (no decode call) or AI
+                 → validate → save → return
   → failure responses: { error[, model] } with NO `found` flag
 
 SEO:
   /product/[slug] — ISR (24h revalidate), server-rendered from the products
-    cache, JSON-LD Product schema (deliberately no `offers`: the price is an AI
+    cache, JSON-LD Product schema (deliberately no `offers`: the price is an
     estimate, not a merchant offer), canonical/OG.
-    Cache older than 90 days is still served but emitted with `noindex`.
+    Cache older than PRODUCT_TTL_DAYS (default 90) is still served but emitted
+    with `noindex`; datasheet-covered rows are corrected on read.
   /sitemap.xml — route handler (dynamic, CDN-cached 1h), top 1000 usable
     products by search_count; degrades to home-only if the DB is unreachable.
   /robots.txt — allow all, disallow /api/, reference sitemap.
@@ -145,6 +155,8 @@ SEO:
 - Both 429 and 503 include a `Retry-After` header computed to 00:00 UTC.
 - One scan consumes one unit (vision + optional decode).
 - Cache hits are never counted.
+- Datasheet hits on `/api/decode` consume no quota; a scan has already spent its
+  one vision unit before the datasheet lookup.
 - Quota is **not** derived from `search_history` anymore; that table is now an
   audit/analytics log with an `outcome` column (currently `ok` on success).
 - Client IP: `getClientIp` only trusts `x-vercel-forwarded-for` when
@@ -156,10 +168,25 @@ SEO:
 
 **Cache semantics**
 
-- `products` rows are considered fresh for **90 days** for decode lookups
-  (`getProductByModel` filters on `updated_at`); stale rows are re-decoded and
-  upserted.
-- SEO pages keep serving the last known row after 90 days but mark it
+- `products` rows are considered fresh for `PRODUCT_TTL_DAYS` (default **90**,
+  clamped 1–365) for decode lookups (`getProductByModel` filters on
+  `updated_at`); stale rows are re-decoded and upserted.
+- Verified products are stored under `datasheetCanonicalModel()` (the entry's
+  canonical name), so `RTX 5090`, `NVIDIA GEFORCE RTX 5090` and `RTX 5090 FE`
+  share one `model_number`, cache row and SEO slug. `/api/decode` and `/api/scan`
+  use that key for the lookup and upsert; the admin refresh route uses it for the
+  upsert.
+- Both `/api/decode` and `/api/scan` look up the canonical datasheet key first,
+  then fall back to the uncanonicalized code. A row cached before its datasheet
+  existed is therefore still found and corrected by the read overlay instead of
+  being orphaned into a duplicate row.
+- `rowToDecodeResult()` applies the datasheet overlay on every read, so a wrong
+  figure stored before its datasheet existed is corrected on read instead of
+  waiting for the TTL.
+- `priceIndicator.basis` is optional (`src/types.ts`) for backwards
+  compatibility: rows cached before the field existed have no basis and keep
+  rendering, without an `MSRP`/`STREET` chip.
+- SEO pages keep serving the last known row after `PRODUCT_TTL_DAYS` but mark it
   `noindex`; there is no background refresh job.
 - `saveProduct` is an atomic `INSERT … ON CONFLICT (model_number) DO UPDATE`,
   except that the slug is **not** updated on conflict so SEO URLs stay stable.
@@ -184,6 +211,28 @@ SEO:
   JSON output (`response_format: json_object`). The parsed payload is
   normalized/validated (`src/lib/validation.ts`); invalid output falls through to
   the next model.
+- **Accuracy contract (decode prompt):** the required identity fields are always
+  present, but a figure that cannot be supported is dropped (or replaced with a
+  qualitative description) rather than guessed; specs are never copied from a
+  sibling, previous-generation or partner model; every numeric spec carries a
+  unit and, where the manufacturer publishes several, its basis. Board power is
+  the figure the manufacturer's own specification table gives for the reference
+  design (TGP/TBP) — never the PSU recommendation, the 16-pin connector rating
+  or a partner board's overclocked BIOS limit. Memory is capacity + type, never
+  bus width as capacity. The release window prefers the US retail on-sale date.
+- **Pricing basis:** the prompt distinguishes `MSRP` (official US launch list
+  price) from `Street` (what a first-party US retailer charges today; a
+  marketplace or resale listing is not a street price) and requires a basis,
+  with `Street` only when a specific retailer can be named. If neither figure is
+  supportable, the whole `priceIndicator` object is omitted rather than guessed.
+  `estimatedPrice` carries a USD figure or range only, and the tier is scored
+  against prices of the same basis.
+- **Normalize before persisting:** decode output is normalized by
+  `src/lib/validation.ts` before it is saved. `basis` is mapped to the
+  `MSRP`/`Street` enum (unknown wording is dropped) and, when a `percent` is
+  present, `level` is derived from it so the meter's label and fill cannot
+  contradict each other (a level-only payload is placed at the bottom of that
+  tier's band — the weakest position its label allows).
 - Vision scan: base64 image (`data:<detected mime>;base64,…`) plus a text
   instruction; returns one of three outcomes — `ok` (model string), `none`
   (nothing legible), `error` (provider failure) — which the route maps to
@@ -193,10 +242,58 @@ SEO:
   Fallback only switches models, not providers.
 - `AI_EXTRA_BODY_JSON` is merged into the request body for provider-specific
   features (for example enabling live web search), and only for the **primary**
-  model in each chain to avoid multiplying that cost.
+  model in each chain to avoid multiplying that cost. When it is unset,
+  `decodeModel()` logs a one-time warning that decoding is ungrounded (server
+  logs only; never user-visible).
 - Requests use `AbortSignal.timeout(AI_TIMEOUT_MS)`, `cache: 'no-store'` and a
   bounded `max_tokens`.
 - All failures throw/log server-side; routes translate them to generic 502s.
+
+## Verified datasheets (`src/lib/datasheets.ts` + `src/lib/decode.ts`)
+
+- `src/lib/datasheets.ts` is a curated, source-checked layer for seven
+  products: GeForce RTX 5090, RTX 5080, RTX 4090 and RTX 5070 Ti, Radeon RX
+  7900 XTX, Samsung 990 PRO, Sony Alpha 7 IV. Each entry carries specs, release
+  window/year, official US launch MSRP, editorial price position, qualitative
+  insight, curated alternatives, source label, source URL (reviewers only;
+  never rendered) and `verifiedOn`. An entry may also carry one dated `street`
+  observation (`price`, `observedOn`, `source`, `percent`): a price a named
+  first-party US retailer actually lists - never a marketplace, resale or
+  tracker aggregate - dated with the month it was reported. When present it
+  becomes the card's headline (`basis: 'Street'`, `observedOn` shown as
+  `as of <Mon YYYY>`) and the MSRP is kept as the small `listPrice` anchor; the
+  tier is then scored with `street.percent` against current street prices.
+- Lookup is by `datasheetKey`: brand words, `GEFORCE`/`RADEON`, `FOUNDERS
+  EDITION` and similar noise are stripped, and keys are space-insensitive, so
+  `RTX 5090`, `NVIDIA GEFORCE RTX 5090`, `RTX 5090 FE`, `RTX5090`, `RTX 5070Ti`,
+  `A7IV`, `RX7900XTX` and the bare model number (`5090`, `4090`) resolve to one
+  entry. Laptop/mobile wording (`LAPTOP`, `MOBILE`, `NOTEBOOK`, `MAX-Q`) is
+  explicitly refused, so `RTX 5090 Laptop GPU` does not inherit the desktop
+  entry. `datasheetCanonicalModel()` returns the
+  entry name, used as the cache key by `/api/decode`, `/api/scan` and the admin
+  refresh route so aliases share one row and one SEO slug.
+- Priority in `decode.ts`: `datasheetDecode()` needs no AI call and no DB read;
+  `decodeProduct()` tries it first, and only uncovered codes reach the AI
+  provider. AI output is still passed through `applyDatasheet()`, so a covered
+  field can never show a model figure.
+- `rowToDecodeResult()` in `src/lib/db/neon.ts` applies the overlay on every
+  cached row read, correcting wrong figures stored before the datasheet existed
+  without waiting for the TTL.
+- `verified` is a `VerificationStamp` (`asOf`, `source`) derived server-side by
+  `applyDatasheet()`. `normalizeDecodeResult()` never copies `verified` from AI
+  output or stored JSONB, so a model cannot claim verification.
+- UI: verified decodes show `Verified specs` instead of `AI Estimate`, a
+  `Verified · <source> · <asOf>` stamp on the Technical DNA card, and only
+  `Street` prices get an `as of <Mon YYYY>` line (an `MSRP` is a launch fact and
+  is never dated). A street headline also renders its launch MSRP as a small
+  `MSRP $x` anchor line, so the card never hides what the product launched at.
+  The verified disclaimer distinguishes curated specs from estimated pricing;
+  the unverified product-page disclaimer says the basis is labelled "when
+  known" because legacy rows have no chip. Both surfaces render server-side.
+- Tests: `tests/datasheets.test.ts` covers key normalization, aliases, entry
+  sourcing and the no-provider-call guarantee; `tests/row-overlay.test.ts` is the
+  regression test for a cached row that still holds the old `600 W TGP` figures.
+  The suite is 98 tests across 7 files.
 
 ## Database (`src/lib/db/neon.ts` + `neon-schema.sql`)
 
@@ -205,10 +302,10 @@ SEO:
   (adds `products.year` + backfill, the `products.search_count DESC` index,
   `search_history.outcome`, the `ai_quota` table, and drops indexes duplicated
   by the UNIQUE constraints).
-- `products` — one row per decoded model: `model_number` (unique), `slug`
-  (unique), brand, category, `key_specs` JSONB, insight, `price_indicator`
-  JSONB, `year`, release window, Amazon link field, `alternatives` JSONB,
-  `search_count`, timestamps.
+- `products` — one row per decoded model: `model_number` (unique; canonical for
+  verified products), `slug` (unique), brand, category, `key_specs` JSONB,
+  insight, `price_indicator` JSONB, `year`, release window, Amazon link field,
+  `alternatives` JSONB, `search_count`, timestamps.
 - `search_history` — append-only audit log: query, optional product FK, source
   `text`/`camera`, hashed IP, `outcome`, timestamp. **Not used for quota.**
 - `ai_quota` — paid-call reserve: `(ip_hash, window_start)` keyed rows with
@@ -242,9 +339,16 @@ SEO:
   - Image detection: base64 shape, magic bytes (`JPEG`/`PNG`/`WEBP`). The scan
     route caps the decoded image at 3 MB and the request body at 4 MB.
   - Amazon link validation restricts to `https:` Amazon storefront hosts.
-- Admin route: `ADMIN_TOKEN` unset ⇒ 404 (feature off, no information leak);
-  missing/wrong `Authorization: Bearer` ⇒ 401; invalid/missing body ⇒ 400;
-  success ⇒ `{ deleted: 0|1, model }`.
+- Admin routes (`DELETE /api/admin/product`, `POST /api/admin/refresh`):
+  `ADMIN_TOKEN` unset ⇒ 404 (feature off, no information leak); cross-origin ⇒
+  403; missing/wrong `Authorization: Bearer` ⇒ 401 (constant-time comparison);
+  non-JSON ⇒ 415; invalid/missing body ⇒ 400, with a 4 KB cap. Delete returns
+  `{ deleted: 0|1, model }`; refresh re-decodes/upserts in place (keeps slug and
+  `search_count`), consumes no quota, and returns
+  `{ refreshed, model, slug, verified, identity, alternatives }`. A refresh that
+  returns no identity is 502; a storage or unexpected failure is 500. A
+  datasheet-covered model is resolved to its canonical name before the upsert,
+  and `model` in the response is that canonical code.
 - Generic client errors; upstream/AI details stay in server logs.
 - Security headers in `next.config.ts`: CSP (`default-src 'self'`,
   `script-src 'self' 'unsafe-inline'` — inline bootstrap is required by Next
@@ -266,10 +370,13 @@ SEO:
 | `src/app/robots.ts` | Crawler directives (allow all, disallow `/api/`) referencing the sitemap |
 | `src/app/manifest.ts` | Web app manifest served at `/manifest.webmanifest` (no offline support) |
 | `src/app/layout.tsx` | Root layout, metadata, viewport config |
-| `src/app/api/decode/route.ts` | Text decode: validate → cache → quota → AI → save |
-| `src/app/api/scan/route.ts` | Scan: validate image → quota → vision → cache/decode → save |
+| `src/app/api/decode/route.ts` | Text decode: validate → canonical key → cache → datasheet → quota → AI → save |
+| `src/app/api/scan/route.ts` | Scan: validate image → quota → vision → canonical key → cache/decode → save |
 | `src/app/api/admin/product/route.ts` | Bearer-token-protected product delete |
+| `src/app/api/admin/refresh/route.ts` | Bearer-token-protected re-decode/upsert, no quota |
 | `src/lib/ai/provider.ts` | AI provider client, prompts, model fallback chains |
+| `src/lib/datasheets.ts` | Curated verified datasheets, canonical keys, overlay |
+| `src/lib/decode.ts` | Datasheet-first decode orchestration |
 | `src/lib/db/neon.ts` | Product CRUD, quota reserve/count, search logging |
 | `src/lib/env.ts` | Central environment access (lazy, validated) |
 | `src/lib/security.ts` | Input sanitizer, client-IP extraction, IP hashing, body limits |
@@ -281,7 +388,7 @@ SEO:
 | `src/components/results/*` | ProductIdentity, PriceMeter, AlternativeList |
 | `src/components/ui/Toast.tsx` | Toast system + container |
 | `src/context/ToastContext.tsx` | Toast provider/context |
-| `tests/*.test.ts` | Vitest unit tests (slug, security, affiliate, validation) |
+| `tests/*.test.ts` | Vitest unit tests (slug, security, affiliate, validation, env, datasheets, cached-row overlay) |
 | `neon-schema.sql` | Full schema for fresh databases |
 | `migrations/001_hardening.sql` | Idempotent upgrade for existing databases |
 
@@ -308,10 +415,10 @@ deliberately differs:
 |---------------|------------------------|
 | Next.js 15 | Next.js 16 |
 | Supabase (Postgres + Auth + Realtime) | Neon serverless Postgres, no auth/realtime |
-| Vercel KV cache, 7-day TTL | `products` table cache, 90-day freshness |
+| Vercel KV cache, 7-day TTL | `products` table cache, configurable freshness (`PRODUCT_TTL_DAYS`, default 90 days) |
 | A specific AI vendor with search grounding | Provider-agnostic chat-completions endpoint; provider features (e.g. live search) opt-in via `AI_EXTRA_BODY_JSON`; model fallback chains |
 | 5 free decodes/day via KV | Atomic DB quota: 5 paid calls per IP per UTC day + 500 global/day; failed calls count; scans cost one unit |
-| `/api/product` CRUD routes | No public product CRUD; only an optional admin DELETE |
+| `/api/product` CRUD routes | No public product CRUD; only optional admin DELETE and refresh routes |
 | No auth; future third-party sign-in | Still no auth/user accounts |
 | PWA: installable + offline | Manifest only; no service worker, no offline support |
 | Capacitor native shells (Phase 2) | Not started; web-only |
@@ -336,12 +443,29 @@ deliberately differs:
 - **CSP `unsafe-inline` scripts:** required by Next.js inline bootstrap until a
   nonce-based CSP is implemented.
 - **Admin protection:** one static bearer token, no rotation, no audit trail;
-  endpoint is off (404) when unset.
-- **AI data quality:** specs/prices/release windows may be wrong or fabricated;
-  no human review. Pricing is US-market only.
+  both admin endpoints are off (404) when unset.
+- **AI data quality (uncovered products):** specs/prices/release windows are
+  model-generated and can still be wrong or fabricated; no human review. Two
+  failure modes seen in practice: graphics power conflated with the connector
+  rating or an overclocked partner-BIOS limit instead of reference-design TGP,
+  and a launch MSRP presented as the current market price. Mitigations are the
+  prompt accuracy contract, an explicit `MSRP`/`STREET` basis label on the price
+  card, and the documented admin refresh endpoint. Pricing is US-market only.
+- **Finite, aging datasheet coverage:** only seven products are curated, and an
+  entry is only as fresh as its `verifiedOn` date. Nothing re-checks it
+  automatically; uncovered products fall back to AI estimates.
+- **A bare label can hide a mobile part:** a label reading only `RTX 5090`, with
+  no laptop/mobile wording, cannot be distinguished from the mobile part by text
+  alone and is served the desktop datasheet. The desktop and mobile parts differ
+  in memory and board power.
+- **Datasheet prices are snapshots, not a price feed:** two entries carry a
+  dated first-party street observation and the rest show the official US launch
+  MSRP. A street observation goes stale within weeks - it is dated on the card
+  and never presented as live, and re-checking it is a manual edit. Nothing
+  polls a retailer or a price API.
 - **Cache staleness:** no background refresh; SEO pages may serve old data
-  (marked `noindex` after 90 days). Products from failed decodes are not
-  cached.
+  (marked `noindex` after `PRODUCT_TTL_DAYS`, default 90). Products from failed
+  decodes are not cached.
 - **Scan accuracy:** model extraction from label images can misfire; sanitized
   but not verified.
 - **Dependency health:** not continuously audited; do not assume `npm audit`

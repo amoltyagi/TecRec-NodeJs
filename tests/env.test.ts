@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getSiteUrl } from '@/lib/env';
+import { getProductTtlDays, getSiteUrl } from '@/lib/env';
 
 /**
  * `getSiteUrl` decides what every canonical tag, the sitemap and robots.txt
@@ -15,6 +15,27 @@ const clearEnv = () => {
   vi.stubEnv('VERCEL_URL', '');
   vi.stubEnv('VERCEL_ENV', '');
 };
+
+describe('getProductTtlDays', () => {
+  it('defaults to 90 days', () => {
+    vi.stubEnv('PRODUCT_TTL_DAYS', '');
+    expect(getProductTtlDays()).toBe(90);
+  });
+
+  it('honours a configured window', () => {
+    vi.stubEnv('PRODUCT_TTL_DAYS', '30');
+    expect(getProductTtlDays()).toBe(30);
+  });
+
+  it('ignores nonsense and out-of-range values instead of caching forever', () => {
+    for (const raw of ['0', '-5', 'abc', '1e9', '1000']) {
+      vi.stubEnv('PRODUCT_TTL_DAYS', raw);
+      const days = getProductTtlDays();
+      expect(days).toBeGreaterThanOrEqual(1);
+      expect(days).toBeLessThanOrEqual(365);
+    }
+  });
+});
 
 describe('getSiteUrl', () => {
   it('prefers explicit configuration and strips trailing slashes', () => {

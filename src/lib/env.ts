@@ -102,6 +102,26 @@ export function getAiConfig(): AiConfig {
   };
 }
 
+/** Default freshness window for a cached decode. */
+const DEFAULT_PRODUCT_TTL_DAYS = 90;
+const MAX_PRODUCT_TTL_DAYS = 365;
+
+/**
+ * How long a cached product is served without re-decoding
+ * (`PRODUCT_TTL_DAYS`, default 90, clamped to 1-365).
+ *
+ * Lowering it makes prices and releases fresher at the cost of one paid AI call
+ * per product per window; it is also the delay between publishing a better
+ * prompt and seeing its effect on already-cached entries.
+ */
+export function getProductTtlDays(): number {
+  const raw = read('PRODUCT_TTL_DAYS');
+  // Integers only: `parseInt` would silently read "1e9" as 1 day.
+  const parsed = raw && /^\d+$/.test(raw) ? Number.parseInt(raw, 10) : Number.NaN;
+  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_PRODUCT_TTL_DAYS;
+  return Math.min(MAX_PRODUCT_TTL_DAYS, parsed);
+}
+
 /** Returns the admin token, or null when the admin surface is disabled. */
 export function getAdminToken(): string | null {
   return read('ADMIN_TOKEN') ?? null;

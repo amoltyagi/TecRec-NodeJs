@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Tag, Box, Layers, Sparkles, Calendar, ShoppingCart } from 'lucide-react';
+import { CheckCircle2, Tag, Box, Layers, Sparkles, Calendar, ShoppingCart, ShieldCheck } from 'lucide-react';
 import { TechIdentity } from '@/types';
 
 interface ProductIdentityProps {
@@ -31,6 +31,16 @@ export const ProductIdentity: React.FC<ProductIdentityProps> = ({ identity, dela
     const specs = Array.isArray(identity?.keySpecs) ? identity.keySpecs : [];
     const insight = typeof identity?.insight === 'string' ? identity.insight.trim() : '';
     const amazonUrl = isSafeHttpsLink(identity?.amazonLink) ? identity.amazonLink : null;
+
+    // Datasheet provenance: written server-side, but rows are also read back from
+    // JSONB, so the label is treated as untrusted text with a bounded length.
+    const verifiedSource =
+        typeof identity?.verified?.source === 'string'
+            ? identity.verified.source.replace(/\s+/g, ' ').trim().slice(0, 60)
+            : '';
+    const verifiedAsOf =
+        typeof identity?.verified?.asOf === 'string' ? identity.verified.asOf.trim().slice(0, 10) : '';
+    const verified = Boolean(identity?.verified) && Boolean(verifiedSource || verifiedAsOf);
 
     // Same spring on every card; when entrance is off there is nothing to animate.
     const cardMotion = (cardDelay: number) => ({
@@ -99,8 +109,28 @@ export const ProductIdentity: React.FC<ProductIdentityProps> = ({ identity, dela
                     {...cardMotion(delay + 0.2)}
                     className="col-span-2 p-5 rounded-[1.5rem] bg-white/5 border border-white/5 flex flex-col gap-4"
                 >
-                    <div className="flex items-center gap-1.5 text-[8px] sm:text-[10px] uppercase font-black tracking-widest text-white/50">
-                        <Layers className="w-3.5 h-3.5" aria-hidden="true" /> Technical DNA
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                        <div className="flex items-center gap-1.5 text-[8px] sm:text-[10px] uppercase font-black tracking-widest text-white/50 shrink-0">
+                            <Layers className="w-3.5 h-3.5" aria-hidden="true" /> Technical DNA
+                        </div>
+                        {verified && (
+                            <div className="flex items-center gap-1 min-w-0 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2 py-0.5 text-[7px] sm:text-[9px] font-black uppercase tracking-widest text-emerald-400">
+                                <ShieldCheck className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
+                                <span className="shrink-0">Verified</span>
+                                {verifiedSource && (
+                                    <>
+                                        <span aria-hidden="true" className="shrink-0 text-emerald-400/40">·</span>
+                                        <span className="min-w-0 truncate">{verifiedSource}</span>
+                                    </>
+                                )}
+                                {verifiedAsOf && (
+                                    <>
+                                        <span aria-hidden="true" className="shrink-0 text-emerald-400/40">·</span>
+                                        <span className="shrink-0 tabular-nums">{verifiedAsOf}</span>
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
                     <div className="grid gap-2.5">
                         {specs.map((spec, idx) => (

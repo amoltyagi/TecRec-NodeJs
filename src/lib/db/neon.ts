@@ -1,12 +1,11 @@
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 import { cache } from 'react';
-import { getDatabaseUrl } from '@/lib/env';
+import { applyDatasheet } from '@/lib/datasheets';
+import { getDatabaseUrl, getProductTtlDays } from '@/lib/env';
 import { shortHash, toSlug } from '@/lib/slug';
 import { displayModel, normalizeDecodeResult, normalizeModelCode } from '@/lib/validation';
 import type { DecodeResult } from '@/types';
 
-/** Products older than this are re-decoded on the next lookup. */
-export const PRODUCT_TTL_DAYS = 90;
 /** Analytics retention. Quota rows are pruned separately. */
 const SEARCH_HISTORY_RETENTION_DAYS = 30;
 const QUOTA_RETENTION_DAYS = 2;
@@ -29,7 +28,7 @@ function isUniqueViolation(error: unknown, constraint: string): boolean {
   return typeof record.message === 'string' && record.message.includes(constraint);
 }
 
-interface ProductRow {
+export interface ProductRow {
   id: string;
   model_number: string;
   slug: string;
@@ -54,8 +53,12 @@ interface ProductRow {
  * output validation existed, so the row is passed through the same normalizer as
  * a fresh AI response. A row that cannot be normalized is treated as missing
  * rather than being allowed to crash the renderer.
+ *
+ * Exported for tests: this is the join point where a stale stored figure meets
+ * the current datasheet, which makes it the regression surface for the bug that
+ * started this work (a cached "600 W TGP" row).
  */
-function rowToDecodeResult(row: ProductRow): DecodeResult | null {
+export function rowToDecodeResult(row: ProductRow): DecodeResult | null {
   const normalized = normalizeDecodeResult(
     {
       identity: {
@@ -74,7 +77,11 @@ function rowToDecodeResult(row: ProductRow): DecodeResult | null {
   );
 
   if (!normalized?.identity) return null;
-  return normalized;
+
+  // Rows written before a datasheet entry existed (or by an older prompt) are
+  // corrected on read, so a wrong cached figure cannot outlive the fix that
+  // covers it or wait for the TTL to expire.
+  return applyDatasheet(row.model_number, normalized);
 }
 
 export interface CachedProduct {
@@ -86,7 +93,7 @@ export async function getProductByModel(model: string): Promise<CachedProduct | 
   const rows = (await getSql()`
     SELECT * FROM products
     WHERE model_number = ${normalizeModelCode(model)}
-      AND updated_at > now() - make_interval(days => ${PRODUCT_TTL_DAYS}::int)
+      AND updated_at > now() - make_interval(days => ${getProductTtlDays()}::int)
     LIMIT 1
   `) as unknown as ProductRow[];
 
@@ -107,7 +114,10 @@ export interface ProductPageData {
   isStale: boolean;
 }
 
-const STALE_AFTER_MS = PRODUCT_TTL_DAYS * 24 * 60 * 60 * 1000;
+/** How old a row may be before SEO pages mark it stale (same window as decode). */
+function staleAfterMs(): number {
+  return getProductTtlDays() * 24 * 60 * 60 * 1000;
+}
 
 /**
  * Per-request memoized: `generateMetadata` and the page component would
@@ -132,7 +142,7 @@ export const getProductBySlug = cache(async (slug: string): Promise<ProductPageD
     searchCount: row.search_count,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    isStale: Date.now() - new Date(row.updated_at).getTime() > STALE_AFTER_MS,
+    isStale: Date.now() - new Date(row.updated_at).getTime() > staleAfterMs(),
   };
 });
 

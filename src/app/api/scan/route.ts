@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { decodeModel, scanImage } from '@/lib/ai/provider';
+import { scanImage } from '@/lib/ai/provider';
+import { decodeProduct } from '@/lib/decode';
+import { datasheetCanonicalModel } from '@/lib/datasheets';
 import {
   getProductByModel,
   logSearch,
@@ -105,7 +107,11 @@ export async function POST(request: Request) {
 
     // Scanning a product we already have still cost a vision call, but should not
     // cost a second one.
-    const cached = await getProductByModel(modelKey);
+    const cacheKey = datasheetCanonicalModel(decodeInput) ?? modelKey;
+    // Same legacy fallback as /api/decode: a row cached under the old spelling is
+    // still the row we want, corrected on read by the datasheet overlay.
+    let cached = await getProductByModel(cacheKey);
+    if (!cached && cacheKey !== modelKey) cached = await getProductByModel(modelKey);
     if (cached) {
       return NextResponse.json({
         found: true,
@@ -116,7 +122,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const decoded = await decodeModel(decodeInput);
+    const decoded = await decodeProduct(decodeInput);
     if (decoded.error || !decoded.identity) {
       console.error('Decode after scan failed:', decoded.error ?? 'payload contained no identity');
       // No `found` flag on failure: the client must not silently re-decode.
@@ -125,9 +131,9 @@ export async function POST(request: Request) {
 
     let slug: string | undefined;
     try {
-      const saved = await saveProduct(modelKey, decoded);
+      const saved = await saveProduct(cacheKey, decoded);
       slug = saved.slug;
-      await logSearch(modelKey, saved.id, 'camera', ipHash);
+      await logSearch(decodeInput, saved.id, 'camera', ipHash);
     } catch (error) {
       console.error('Failed to persist scanned product:', error);
     }

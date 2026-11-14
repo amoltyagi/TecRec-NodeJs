@@ -142,6 +142,106 @@ describe('normalizeDecodeResult', () => {
     expect(result?.identity?.priceIndicator).toBeUndefined();
   });
 
+  it('derives the tier from the percentage so the label and the bar cannot disagree', () => {
+    const result = normalizeDecodeResult({
+      identity: {
+        brand: 'NVIDIA',
+        insight: 'ok',
+        priceIndicator: { level: 'Value', percent: 96, estimatedPrice: '$1,999', basis: 'MSRP' },
+      },
+    });
+    expect(result?.identity?.priceIndicator?.percent).toBe(96);
+    expect(result?.identity?.priceIndicator?.level).toBe('Elite');
+  });
+
+  it('places a tier-only payload at the bottom of that tier band', () => {
+    const result = normalizeDecodeResult({
+      identity: { brand: 'B', insight: 'ok', priceIndicator: { level: 'Elite', estimatedPrice: '$1,999' } },
+    });
+    expect(result?.identity?.priceIndicator?.level).toBe('Elite');
+    expect(result?.identity?.priceIndicator?.percent).toBe(76);
+  });
+
+  it('records whether the price is a launch MSRP or a street price', () => {
+    const msrp = normalizeDecodeResult({
+      identity: { brand: 'B', insight: 'ok', priceIndicator: { percent: 90, estimatedPrice: '$1,999', basis: 'msrp' } },
+    });
+    expect(msrp?.identity?.priceIndicator?.basis).toBe('MSRP');
+
+    const street = normalizeDecodeResult({
+      identity: {
+        brand: 'B',
+        insight: 'ok',
+        priceIndicator: { percent: 90, estimatedPrice: '$2,700-$2,800', basis: 'Street price' },
+      },
+    });
+    expect(street?.identity?.priceIndicator?.basis).toBe('Street');
+    expect(street?.identity?.priceIndicator?.estimatedPrice).toBe('$2,700-$2,800');
+  });
+
+  it('keeps a street observation date and its MSRP anchor', () => {
+    const result = normalizeDecodeResult({
+      identity: {
+        brand: 'B',
+        insight: 'ok',
+        priceIndicator: {
+          percent: 100,
+          estimatedPrice: '$6,250',
+          basis: 'Street',
+          observedOn: '2026-11-01',
+          listPrice: '$1,999',
+        },
+      },
+    });
+    expect(result?.identity?.priceIndicator?.basis).toBe('Street');
+    expect(result?.identity?.priceIndicator?.observedOn).toBe('2026-11-01');
+    expect(result?.identity?.priceIndicator?.listPrice).toBe('$1,999');
+  });
+
+  it('drops an impossible date and a redundant anchor', () => {
+    const result = normalizeDecodeResult({
+      identity: {
+        brand: 'B',
+        insight: 'ok',
+        priceIndicator: {
+          percent: 50,
+          estimatedPrice: '$999',
+          basis: 'Street',
+          observedOn: '2026-13-45',
+          listPrice: '$999',
+        },
+      },
+    });
+    expect(result?.identity?.priceIndicator?.observedOn).toBeUndefined();
+    expect(result?.identity?.priceIndicator?.listPrice).toBeUndefined();
+  });
+
+  it('omits an unrecognised price basis instead of guessing one', () => {
+    const result = normalizeDecodeResult({
+      identity: { brand: 'B', insight: 'ok', priceIndicator: { percent: 40, estimatedPrice: '$399', basis: 'recommended' } },
+    });
+    expect(result?.identity?.priceIndicator?.basis).toBeUndefined();
+  });
+
+  it('ignores a verification stamp supplied by the model or a stored row', () => {
+    const result = normalizeDecodeResult({
+      identity: {
+        brand: 'NVIDIA',
+        insight: 'ok',
+        verified: { asOf: '2026-01-01', source: 'claimed by the model' },
+      },
+    });
+    // Verification is derived server-side from the curated datasheet only.
+    expect(result?.identity?.verified).toBeUndefined();
+  });
+
+  it('still renders a cached price that has no basis field', () => {
+    const result = normalizeDecodeResult({
+      identity: { brand: 'B', insight: 'ok', priceIndicator: { level: 'Premium', percent: 65, estimatedPrice: '$399' } },
+    });
+    expect(result?.identity?.priceIndicator).toEqual({ level: 'Premium', percent: 65, estimatedPrice: '$399' });
+  });
+
   it('derives the year from the release window when missing', () => {
     const result = normalizeDecodeResult({
       identity: { brand: 'B', insight: 'ok', releaseWindow: 'Late 2024' },

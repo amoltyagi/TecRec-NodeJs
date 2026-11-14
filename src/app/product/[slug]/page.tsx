@@ -86,6 +86,9 @@ export default async function ProductPage({ params }: PageProps) {
   const model = displayModel(product.model, brand);
   const priceIndicator = identity.priceIndicator;
   const stale = product.isStale;
+  // Present only for rows filled from the curated datasheet; the card stamp and
+  // the disclaimer both read it, so the copy stays truthful either way.
+  const isVerified = Boolean(identity.verified);
 
   // Alternatives link to their own cached page when one exists: a crawlable
   // internal link instead of a client-rendered deep link that can cost an AI call.
@@ -165,7 +168,9 @@ export default async function ProductPage({ params }: PageProps) {
 
           <div className="space-y-4">
             <ProductIdentity identity={identity} entrance={false} />
-            {priceIndicator && <PriceMeter indicator={priceIndicator} entrance={false} />}
+            {priceIndicator && (
+              <PriceMeter indicator={priceIndicator} entrance={false} asOf={identity.verified?.asOf ?? product.updatedAt} />
+            )}
           </div>
 
           {alternativeLinks.length > 0 && (
@@ -198,8 +203,19 @@ export default async function ProductPage({ params }: PageProps) {
           )}
 
           <p className="text-[11px] text-white/40 mt-8 leading-relaxed">
-            Specs, release timing and pricing are AI-estimated from public web sources and may be
-            outdated or inaccurate - verify before purchasing.
+            {isVerified ? (
+              <>
+                Specs and release timing come from a curated verified datasheet. Pricing is still an
+                estimate &mdash; either the official US launch MSRP or a current street price,
+                labelled on the card &mdash; not a merchant offer. Verify before purchasing.
+              </>
+            ) : (
+              <>
+                Specs, release timing and pricing are AI-estimated and may be outdated or inaccurate.
+                The price shown is either the official US launch MSRP or a current street price, labelled
+                on the card when known - verify before purchasing.
+              </>
+            )}
             {stale ? ' This entry has not been refreshed recently.' : ''}
           </p>
         </article>

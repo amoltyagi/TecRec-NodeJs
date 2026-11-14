@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { decodeModel } from '@/lib/ai/provider';
+import { datasheetDecode, decodeProduct } from '@/lib/decode';
+import { datasheetCanonicalModel } from '@/lib/datasheets';
 import {
   getProductByModel,
   incrementSearchCount,
@@ -48,12 +49,45 @@ export async function POST(request: Request) {
 
     maybePruneExpiredData();
 
+    // Verified products are cached under their canonical name so every spelling of
+    // the same model shares one row (and one SEO slug).
+    const datasheetModel = datasheetCanonicalModel(modelInput);
+    const cacheKey = datasheetModel ?? modelInput;
+
     // Cache first. Reading a product we already paid for must never consume quota
     // (and must stay available after the daily limit is reached).
-    const cached = await getProductByModel(modelInput);
+    const cached = await getProductByModel(cacheKey);
     if (cached) {
-      await incrementSearchCount(modelInput);
+      await incrementSearchCount(cacheKey);
       return NextResponse.json({ ...cached.result, slug: cached.slug });
+    }
+
+    // A verified product may already be cached under the caller's older spelling
+    // (rows written before its datasheet existed). Fall back to that row instead
+    // of orphaning it - the read path applies the datasheet overlay to it anyway.
+    if (datasheetModel) {
+      const legacy = await getProductByModel(modelInput);
+      if (legacy) {
+        await incrementSearchCount(modelInput);
+        return NextResponse.json({ ...legacy.result, slug: legacy.slug });
+      }
+    }
+
+    // Verified datasheet hit: answer without spending a paid call, and without
+    // consuming the caller's daily budget. Checked before the quota reserve for
+    // the same reason a cache hit is: no money is spent on this path.
+    const curated = datasheetDecode(modelInput);
+    if (curated) {
+      let curatedSlug: string | undefined;
+      try {
+        const saved = await saveProduct(cacheKey, curated);
+        curatedSlug = saved.slug;
+        // Log what the shopper actually asked for; the row is linked by id.
+        await logSearch(modelInput, saved.id, 'text', hashIp(getClientIp(request)));
+      } catch (error) {
+        console.error('Failed to persist verified product:', error);
+      }
+      return NextResponse.json({ ...curated, slug: curatedSlug });
     }
 
     const ipHash = hashIp(getClientIp(request));
@@ -75,7 +109,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const decoded = await decodeModel(modelInput);
+    const decoded = await decodeProduct(modelInput);
     if (decoded.error || !decoded.identity) {
       console.error('Decode failed:', decoded.error ?? 'payload contained no identity');
       return jsonError(502, 'Could not decode this model right now. Please try again later.');

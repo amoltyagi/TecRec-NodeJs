@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Cpu, ClipboardPaste, ScanBarcode, ArrowLeft, Loader2, Info, Sparkles, ExternalLink } from 'lucide-react';
+import { Search, Cpu, ClipboardPaste, ScanBarcode, ArrowLeft, Loader2, Info, Sparkles, ExternalLink, ShieldCheck } from 'lucide-react';
 import { CameraView } from '@/components/scanner/CameraView';
 import { ProductIdentity } from '@/components/results/ProductIdentity';
 import { PriceMeter } from '@/components/results/PriceMeter';
@@ -341,6 +341,9 @@ export default function Home() {
   const alternatives: AlternativeModel[] = Array.isArray(rawAlternatives) ? rawAlternatives : [];
   const hasContent = Boolean(identity) || alternatives.length > 0;
   const permalinkSlug = result?.slug;
+  // Only present when the figures came from the curated datasheet, never from a
+  // model guess; the pill and the price provenance line both key off it.
+  const isVerified = Boolean(identity?.verified);
 
   return (
     <div className="relative min-h-dvh w-full flex flex-col items-stretch justify-start sm:items-center sm:justify-center overflow-hidden pt-safe pb-safe px-safe sm:p-6 lg:p-10 font-sans antialiased">
@@ -529,9 +532,25 @@ export default function Home() {
                             <ExternalLink className="w-3 h-3" aria-hidden="true" /> Full page
                           </Link>
                         )}
-                        <div className="flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20 shrink-0">
-                          <Sparkles className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
-                          <span className="text-[8px] font-black uppercase tracking-widest text-emerald-400/80">AI Estimate</span>
+                        <div
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border shrink-0 ${
+                            isVerified
+                              ? 'bg-emerald-500/15 border-emerald-400/30 shadow-[0_0_14px_rgba(52,211,153,0.15)]'
+                              : 'bg-emerald-500/10 border-emerald-500/20'
+                          }`}
+                        >
+                          {isVerified ? (
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
+                          ) : (
+                            <Sparkles className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
+                          )}
+                          <span
+                            className={`text-[8px] font-black uppercase tracking-widest ${
+                              isVerified ? 'text-emerald-300' : 'text-emerald-400/80'
+                            }`}
+                          >
+                            {isVerified ? 'Verified specs' : 'AI Estimate'}
+                          </span>
                         </div>
                       </div>
                     </header>
@@ -542,7 +561,11 @@ export default function Home() {
                           {identity && <ProductIdentity identity={identity} />}
 
                           {identity?.priceIndicator && (
-                            <PriceMeter indicator={identity.priceIndicator} delay={0.4} />
+                            <PriceMeter
+                              indicator={identity.priceIndicator}
+                              delay={0.4}
+                              asOf={identity.verified?.asOf}
+                            />
                           )}
                         </div>
 
@@ -560,7 +583,11 @@ export default function Home() {
                     </div>
 
                     <p className="shrink-0 mt-1 text-[9px] sm:text-[10px] leading-relaxed text-white/60">
-                      Specs and pricing are AI-estimated from public sources &mdash; verify before buying.
+                      {isVerified ? (
+                        <>Verified specs come from a curated datasheet. The price shown is still an estimate &mdash; launch MSRP or current street price, not a merchant offer. Verify before buying.</>
+                      ) : (
+                        <>Specs and prices are AI estimates &mdash; the figure shown is either the launch MSRP or a current street price. Verify before buying.</>
+                      )}
                     </p>
 
                     {/* Bottom "Another model..." bar (ported from the legacy result view) */}

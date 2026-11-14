@@ -1,4 +1,4 @@
-import type { AlternativeModel, DecodeResult, PriceIndicator, TechIdentity } from '@/types';
+import type { AlternativeModel, DecodeResult, PriceBasis, PriceIndicator, TechIdentity } from '@/types';
 
 export const MAX_MODEL_LENGTH = 200;
 const MAX_BRAND_LENGTH = 80;
@@ -62,27 +62,88 @@ export function displayModel(model: string, brand: string): string {
   return cleanModelText;
 }
 
-type PriceLevel = 'Value' | 'Mid-Range' | 'Premium' | 'Elite';
+export type PriceLevel = 'Value' | 'Mid-Range' | 'Premium' | 'Elite';
 
-function normalizePercent(raw: unknown): number {
+/**
+ * Bar position when the model reports a tier but no percentage: the bottom of
+ * that tier's band, which is the weakest claim consistent with the label. Value
+ * is the exception - its band starts at zero and would render as an empty bar -
+ * so it sits at a visible sliver instead.
+ */
+const LEVEL_FLOOR: Record<PriceLevel, number> = {
+  Value: 12,
+  'Mid-Range': 26,
+  Premium: 51,
+  Elite: 76,
+};
+
+/** `null` when the raw value is absent or unparseable (distinct from a real 0). */
+function parsePercent(raw: unknown): number | null {
+  if (raw === null || raw === undefined || raw === '') return null;
   const numeric =
     typeof raw === 'number' ? raw : Number.parseFloat(cleanText(raw, 12).replace('%', ''));
-  if (!Number.isFinite(numeric)) return 50;
+  if (!Number.isFinite(numeric)) return null;
   return Math.min(100, Math.max(0, Math.round(numeric)));
 }
 
-function normalizeLevel(raw: unknown, percent: number): PriceLevel {
-  const text = cleanText(raw, 40).toLowerCase().replace(/[\s_]+/g, '-');
-  if (text === 'value' || text === 'budget') return 'Value';
-  if (text === 'mid-range' || text === 'midrange' || text === 'mid') return 'Mid-Range';
-  if (text === 'premium') return 'Premium';
-  if (text === 'elite' || text === 'luxury') return 'Elite';
+/**
+ * The single source of truth for tier boundaries: the price card's label, the
+ * meter fill and the curated datasheet all derive the tier through this.
+ */
+export function priceLevelForPercent(percent: number): PriceLevel {
   if (percent <= 25) return 'Value';
   if (percent <= 50) return 'Mid-Range';
   if (percent <= 75) return 'Premium';
   return 'Elite';
 }
 
+function parseLevel(raw: unknown): PriceLevel | null {
+  const text = cleanText(raw, 40).toLowerCase().replace(/[\s_]+/g, '-');
+  if (text === 'value' || text === 'budget') return 'Value';
+  if (text === 'mid-range' || text === 'midrange' || text === 'mid') return 'Mid-Range';
+  if (text === 'premium') return 'Premium';
+  if (text === 'elite' || text === 'luxury') return 'Elite';
+  return null;
+}
+
+/** Only a real calendar date is accepted; anything else renders nothing. */
+function normalizeObservedOn(raw: unknown): string | undefined {
+  const text = cleanText(raw, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!match) return undefined;
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+  return text;
+}
+
+/**
+ * Which dollar figure the price is: the launch list price or today's street
+ * price. Unrecognised wording is dropped rather than guessed, so the UI never
+ * labels a number with a basis the model did not actually state.
+ */
+function normalizeBasis(raw: unknown): PriceBasis | undefined {
+  const tokens = cleanText(raw, 24)
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter(Boolean);
+
+  if (tokens.some((token) => ['msrp', 'list', 'launch', 'rrp', 'official', 'retail'].includes(token))) {
+    return 'MSRP';
+  }
+  if (tokens.some((token) => ['street', 'market', 'current', 'today', 'resale', 'secondary'].includes(token))) {
+    return 'Street';
+  }
+  return undefined;
+}
+
+/**
+ * Normalize the price card.
+ *
+ * `level` is derived from `percent` whenever a percentage is present: the label
+ * and the meter fill are two representations of the same claim, so they must
+ * never disagree (a "Value" label on a 90% bar was possible before).
+ */
 function normalizePriceIndicator(raw: unknown): PriceIndicator | undefined {
   const record = asRecord(raw);
   if (!record) return undefined;
@@ -93,8 +154,36 @@ function normalizePriceIndicator(raw: unknown): PriceIndicator | undefined {
   // A bare percentage is meaningless as a price; require a digit in the string.
   if (!/\d/.test(estimatedPrice)) return undefined;
 
-  const percent = normalizePercent(record.percent);
-  return { level: normalizeLevel(record.level, percent), percent, estimatedPrice };
+  const basis = normalizeBasis(record.basis);
+  const percent = parsePercent(record.percent);
+  const declaredLevel = parseLevel(record.level);
+
+  let level: PriceLevel;
+  let resolvedPercent: number;
+  if (percent !== null) {
+    resolvedPercent = percent;
+    level = priceLevelForPercent(percent);
+  } else if (declaredLevel) {
+    level = declaredLevel;
+    resolvedPercent = LEVEL_FLOOR[declaredLevel];
+  } else {
+    level = 'Mid-Range';
+    resolvedPercent = 50;
+  }
+
+  const indicator: PriceIndicator = { level, percent: resolvedPercent, estimatedPrice };
+  if (basis) indicator.basis = basis;
+
+  const observedOn = normalizeObservedOn(record.observedOn);
+  if (observedOn) indicator.observedOn = observedOn;
+
+  // The anchor only means something next to a different (street) headline.
+  const listPrice = cleanText(record.listPrice, MAX_PRICE_LENGTH);
+  if (listPrice && /\d/.test(listPrice) && listPrice !== estimatedPrice) {
+    indicator.listPrice = listPrice;
+  }
+
+  return indicator;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
